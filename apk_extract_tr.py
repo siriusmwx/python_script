@@ -2,9 +2,19 @@
 import re
 import os
 import sys
+import time
 import argparse
 import threading
 from subprocess import run, PIPE, DEVNULL
+
+
+def run_time(func):
+    def wrapper(*args, **kwargs):
+        print('Starting extracting apks,waiting...')
+        start_time = time.time()
+        func(*args, **kwargs)
+        print('Finished with %.2f seconds' % (time.time() - start_time))
+    return wrapper
 
 
 def find_adb():
@@ -29,13 +39,13 @@ def find_adb():
         exit(1)
 
 
-def adb_command(cmd, shell=False, debug=None):
+def adb_command(command_list, shell=False, debug=None):
     '''运行adb命令，并返回进程，如果shell为真，则使用adb shell命令，debug=1
     则输出结果到标准输出，debug=2则输出结果到DEVNULL，默认为PIPE'''
     cmd_list = [adb]
     if shell:
         cmd_list.append('shell')
-    cmd_list += cmd.strip().split()
+    cmd_list += command_list
     if debug == 1:
         stdout = sys.stdout
     elif debug == 2:
@@ -48,8 +58,8 @@ def adb_command(cmd, shell=False, debug=None):
 
 
 def list_apks(output_file=None):
-    '''列出手机中所有已安装软件名称，如果output_file有值，则导出软件包名至文件中'''
-    output = adb_command('pm list packages', shell=True).stdout
+    '''列出手机中所有已安装软件名称，如果output_file非空，则导出软件包名至文件中'''
+    output = adb_command(['pm', 'list', 'packages'], shell=True).stdout
     apk_list = output.strip().split('\n')
     apk_names = []
     for apk_info in apk_list:
@@ -57,13 +67,38 @@ def list_apks(output_file=None):
         apk_names.append(apk_name)
         apk_names.sort()
     if output_file:
-        with open(output_file, 'w') as f:
+        with open(output_file, 'w', newline='') as f:
             f.write(os.linesep.join(apk_names) + os.linesep)
     return apk_names
 
 
+def search_apk(apk_name, apk_list):
+    pattern = re.compile(apk_name, re.I)
+    for apk in apk_list:
+        if re.search(pattern, apk):
+            print(apk)
+
+
+def extract_apk(apk_name, extract_dir, apk_path=None):
+    '''根据apk的名称与apk_path来提取软件包至extract_dir'''
+    if not apk_path:
+        output = adb_command(['pm', 'path', apk_name],
+                             shell=True).stdout.strip()
+        if output:
+            apk_path = output.split('\n')[0].replace('package:', '')
+        else:
+            print("%s doesn't installed" % (apk_name))
+            return
+    proc = adb_command(['pull', apk_path, os.path.join(
+        extract_dir, apk_name + '.apk')], debug=1)
+    if proc.returncode == 0:
+        with open(os.path.join(extract_dir, 'apk_list.txt'), 'a+', newline='') as f:
+            f.write(apk_name + os.linesep)
+
+
+@run_time
 def parser_apks_tr(extract=None, thread_num=6):
-    '''整理手机中已安装的软件包名，如果extract非空则提取对应软件包'''
+    '''整理手机中已安装的软件包名，如果extract非空则提取对应软件包，默认最多5线程同时运行'''
     if extract == 'all' or extract == 'data':
         if not os.path.exists(data_apk_dir):
             os.makedirs(data_apk_dir)
@@ -75,17 +110,17 @@ def parser_apks_tr(extract=None, thread_num=6):
         if os.path.exists(os.path.join(system_apk_dir, 'apk_list.txt')):
             os.remove(os.path.join(system_apk_dir, 'apk_list.txt'))
     for apk_name in list_apks():
-        output = adb_command('pm path ' + apk_name, shell=True).stdout
+        output = adb_command(['pm', 'path', apk_name], shell=True).stdout
         apk_path = output.strip().split('\n')[0].replace('package:', '')
         if '/data/app/' in apk_path:
             if extract == 'all' or extract == 'data':
                 t = threading.Thread(target=extract_apk, args=(
-                    apk_name, data_apk_dir), daemon=True)
+                    apk_name, data_apk_dir, apk_path), daemon=True)
                 t.start()
         else:
             if extract == 'all' or extract == 'system':
                 t = threading.Thread(target=extract_apk, args=(
-                    apk_name, system_apk_dir), daemon=True)
+                    apk_name, system_apk_dir, apk_path), daemon=True)
                 t.start()
         while True:
             if len(threading.enumerate()) < thread_num:
@@ -94,22 +129,9 @@ def parser_apks_tr(extract=None, thread_num=6):
         pass
 
 
-def extract_apk(apk_name, extract_dir):
-    '''根据apk的名称提取软件包到extract_apk文件夹下'''
-    proc = adb_command('pm path ' + apk_name, shell=True)
-    output = proc.stdout.strip()
-    if output:
-        apk_path = output.split('\n')[0].replace('package:', '')
-        proc = adb_command('pull ' + apk_path + ' ' +
-                           os.path.join(extract_dir, apk_name + '.apk'), debug=1)
-        if proc.returncode == 0:
-            with open(os.path.join(extract_dir, 'apk_list.txt'), 'a+') as f:
-                f.write(apk_name + os.linesep)
-    else:
-        print("%s doesn't installed" % (apk_name))
-
-
+@run_time
 def extract_apks_tr(apk_list, extract_dir, thread_num=6):
+    '''根据apk_list来提取软件包至extract_dir，默认最多5线程同时运行'''
     if not os.path.exists(extract_dir):
         os.makedirs(extract_dir)
     if os.path.exists(os.path.join(extract_dir, 'apk_list.txt')):
@@ -125,13 +147,6 @@ def extract_apks_tr(apk_list, extract_dir, thread_num=6):
                     break
     while len(threading.enumerate()) > 1:
         pass
-
-
-def search_apk(apk_name, apk_list):
-    pattern = re.compile(apk_name, re.I)
-    for apk in apk_list:
-        if re.search(pattern, apk):
-            print(apk)
 
 
 def build_opt_parser():
