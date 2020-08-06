@@ -7,6 +7,8 @@ import argparse
 import threading
 from subprocess import run, PIPE, DEVNULL
 
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
 
 def run_time(func):
     def wrapper(*args, **kwargs):
@@ -18,11 +20,10 @@ def run_time(func):
 
 
 def find_adb():
-    global adb
     if sys.platform == 'linux':
         proc = run(['which', 'adb'], stdout=PIPE)
         if proc.stdout:
-            adb = 'adb'
+            return 'adb'
         else:
             print("Can't find adb command,please install android-tools-adb")
             exit(1)
@@ -30,9 +31,10 @@ def find_adb():
     elif sys.platform == 'win32':
         adb_path = os.path.join(current_dir, 'platform-tools', 'adb.exe')
         if os.path.isfile(adb_path):
-            adb = adb_path
+            return adb_path
         else:
             print("please make sure platform-tools is in %s" % (current_dir))
+            print("or use --adb argument to given adb binary")
             exit(1)
     else:
         print("This script only support linux and windows platform")
@@ -97,14 +99,18 @@ def extract_apk(apk_name, extract_dir, apk_path=None):
 
 
 @run_time
-def parser_apks_tr(extract=None, thread_num=6):
+def parser_apks_tr(extract=None, thread_num=None):
     '''整理手机中已安装的软件包名，如果extract非空则提取对应软件包，默认最多5线程同时运行'''
+    if not thread_num:
+        thread_num = 6
     if extract == 'all' or extract == 'data':
+        data_apk_dir = os.path.join(current_dir, 'data_apk')
         if not os.path.exists(data_apk_dir):
             os.makedirs(data_apk_dir)
         if os.path.exists(os.path.join(data_apk_dir, 'apk_list.txt')):
             os.remove(os.path.join(data_apk_dir, 'apk_list.txt'))
     if extract == 'all' or extract == 'system':
+        system_apk_dir = os.path.join(current_dir, 'system_apk')
         if not os.path.exists(system_apk_dir):
             os.makedirs(system_apk_dir)
         if os.path.exists(os.path.join(system_apk_dir, 'apk_list.txt')):
@@ -130,8 +136,10 @@ def parser_apks_tr(extract=None, thread_num=6):
 
 
 @run_time
-def extract_apks_tr(apk_list, extract_dir, thread_num=6):
+def extract_apks_tr(apk_list, extract_dir, thread_num=None):
     '''根据apk_list来提取软件包至extract_dir，默认最多5线程同时运行'''
+    if not thread_num:
+        thread_num = 6
     if not os.path.exists(extract_dir):
         os.makedirs(extract_dir)
     if os.path.exists(os.path.join(extract_dir, 'apk_list.txt')):
@@ -164,13 +172,27 @@ def build_opt_parser():
                         help="导出所有已安装的系统软件包与用户软件包名称到文件中")
     parser.add_argument('--extract', action='store', choices=['all', 'data', 'system'],
                         help="选择需导出的软件包类型，所有已安装软件包或系统自带软件包或用户安装的软件包")
+    parser.add_argument('-t', '--thread', action='store', type=int, metavar='thread_num',
+                        help="设置最多允许同时运行的线程的个数，默认为5个线程")
+    parser.add_argument('-e', '--adb', metavar='COMMAND', type=str,
+                        help='使用该选项手动指定adb可执行路径.')
     return parser
 
 
 def main():
     parser = build_opt_parser()
     options = parser.parse_args()
-    find_adb()
+    basename = os.path.basename(__file__)
+    extract_apk_dir = os.path.join(current_dir, 'extract_apk')
+    global adb
+    if options.adb:
+        adb = options.adb
+    else:
+        adb = find_adb()
+    if options.thread:
+        thread_num = options.thread + 1
+    else:
+        thread_num = None
     if options.list:
         apk_list = list_apks()
         print(os.linesep.join(apk_list))
@@ -184,11 +206,11 @@ def main():
             search_apk(apk_name, apk_list)
         exit(0)
     elif options.pull:
-        extract_apks_tr(options.pull, extract_apk_dir)
+        extract_apks_tr(options.pull, extract_apk_dir, thread_num=thread_num)
         exit(0)
     elif options.extract:
         try:
-            parser_apks_tr(extract=options.extract)
+            parser_apks_tr(extract=options.extract, thread_num=thread_num)
             exit(0)
         except KeyboardInterrupt:
             print("\n(^C) Control-C Interrupted")
@@ -197,7 +219,7 @@ def main():
         with open(options.config) as f:
             apk_list = f.readlines()
         try:
-            extract_apks_tr(apk_list, extract_apk_dir)
+            extract_apks_tr(apk_list, extract_apk_dir, thread_num=thread_num)
             exit(0)
         except KeyboardInterrupt:
             print("\n(^C) Control-C Interrupted")
@@ -211,9 +233,4 @@ def main():
 
 
 if __name__ == '__main__':
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    basename = os.path.basename(__file__)
-    data_apk_dir = os.path.join(current_dir, 'data_apk')
-    system_apk_dir = os.path.join(current_dir, 'system_apk')
-    extract_apk_dir = os.path.join(current_dir, 'extract_apk')
     main()
