@@ -158,8 +158,7 @@ def extract_apks_tr(apk_list, extract_dir, thread_num=None):
 
 
 def build_opt_parser():
-    parser = argparse.ArgumentParser(
-        '一个简单的脚本用于从手机中提取安装的软件包到指定目录中')
+    parser = argparse.ArgumentParser(description='一个简单的脚本用于从手机中提取安装的软件包到指定目录中')
     parser.add_argument('--pull', action='store', nargs='+', metavar='apk_name',
                         help="提取一个或多个软件包到extract_apk目录")
     parser.add_argument('-l', '--list', action='store_true', default=False,

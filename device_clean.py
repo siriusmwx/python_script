@@ -9,46 +9,6 @@ msg_format = "%(asctime)s::%(name)s::%(levelname)s::%(threadName)s::%(message)s"
 std_format = "%(asctime)s:%(name)s:%(levelname)s:%(message)s"
 
 
-class clean_device(threading.Thread):
-
-    def __init__(self, name=None, device=None, daemon=None):
-        super().__init__(name=name, daemon=daemon)
-        self.device = device
-
-    def run(self):
-        std_logger.debug('Start to clean %s' % (self.device))
-        proc = Popen('DeviceCleanupCmd "%s" -t' % (self.device),
-                     stdout=PIPE, stderr=DEVNULL, shell=True, universal_newlines=True)
-        while proc.poll() == None:
-            my_loger.info(proc.stdout.readline().rstrip())
-        if proc.returncode == 0:
-            std_logger.debug('Success to clean %s' % (self.device))
-
-
-def run_time(func):
-    def wrapper(*args, **kwargs):
-        std_logger.debug('Start to clean devices,please waiting...')
-        start_time = time.time()
-        func(*args, **kwargs)
-        std_logger.debug('Finished clean with %.2f seconds' %
-                         (time.time() - start_time))
-    return wrapper
-
-
-@run_time
-def clean_tr(device_list, thread_num=None):
-    if not thread_num:
-        thread_num = 6
-    for device in device_list:
-        task = clean_device(device=device.rstrip(), daemon=True)
-        task.start()
-        while True:
-            if len(threading.enumerate()) < thread_num:
-                break
-    while len(threading.enumerate()) > 1:
-        pass
-
-
 def handler(filename=None,  filemode='a', backup=False,
             stream=None, msg_fmt=None, data_fmt=None):
     if filename:
@@ -72,6 +32,46 @@ def logger(name=None, handler=None, level=logging.DEBUG):
     if handler:
         logger.addHandler(handler)
     return logger
+
+
+def run_time(func):
+    def wrapper(*args, **kwargs):
+        std_logger.debug('Start to clean devices,please waiting...')
+        start_time = time.time()
+        func(*args, **kwargs)
+        std_logger.debug('Finished clean with %.2f seconds' %
+                         (time.time() - start_time))
+    return wrapper
+
+
+class clean_device(threading.Thread):
+
+    def __init__(self, name=None, device=None, daemon=None):
+        super().__init__(name=name, daemon=daemon)
+        self.device = device
+
+    def run(self):
+        std_logger.debug('Start to clean %s' % (self.device))
+        proc = Popen('DeviceCleanupCmd "%s" -t' % (self.device),
+                     stdout=PIPE, stderr=DEVNULL, shell=True, universal_newlines=True)
+        while proc.poll() == None:
+            my_loger.info(proc.stdout.readline().rstrip())
+        if proc.returncode == 0:
+            std_logger.debug('Success to clean %s' % (self.device))
+
+
+@run_time
+def clean_tr(device_list, thread_num=None):
+    if not thread_num:
+        thread_num = 6
+    for device in device_list:
+        task = clean_device(device=device.rstrip(), daemon=True)
+        task.start()
+        while True:
+            if len(threading.enumerate()) < thread_num:
+                break
+    while len(threading.enumerate()) > 1:
+        pass
 
 if __name__ == '__main__':
     file_handler = handler('clean.log', backup=True, msg_fmt=msg_format)
