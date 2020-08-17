@@ -1,6 +1,5 @@
 #!/usr/bin/python3
 import os
-import sys
 import signal
 import argparse
 from subprocess import Popen, run, PIPE, DEVNULL
@@ -155,7 +154,7 @@ class Disk:
 
 def install_grub(disk, mount_point):
     print(color(
-        "{+} {O}Starting to install grub to {G}%s{O},please waiting...{W}" % (disk)))
+        "\n{+} {O}Starting to install grub to {G}%s{O},please waiting...{W}" % (disk)))
     proc = run(['mount', '--bind', '/dev', '%s/dev' % (mount_point)])
     proc = run(['mount', '--bind', '/proc', '%s/proc' % (mount_point)])
     proc = run(['mount', '--bind', '/sys', '%s/sys' % (mount_point)])
@@ -167,7 +166,6 @@ def install_grub(disk, mount_point):
     else:
         print(color(
             "{+} {R}Failed{O} to install grub to {G}%s.{W}" % (disk)))
-        exit(1)
 
 
 def system_recovery(disk, backup, mount_point='/mnt'):
@@ -175,33 +173,47 @@ def system_recovery(disk, backup, mount_point='/mnt'):
         os.makedirs(mount_point)
     dev = Disk(disk)
     dev.creat_partiton()
-    proc = run(['umount', disk + '*'])
+    # proc = run(['umount', disk + '*'])
     if dev.efi_flag:
         proc = run(['mount', disk + '2', mount_point])
+        if proc.returncode != 0:
+            exit(1)
+        mount_list = [disk + '2']
     else:
         proc = run(['mount', disk + '1', mount_point])
+        if proc.returncode != 0:
+            exit(1)
+        mount_list = [disk + '1']
     proc = Popen(['tar', '-xvpzf', backup, '-C', mount_point],
-                 stdout=PIPE, stderr=DEVNULL, universal_newlines=True)
-    print(color("{+} {O}Start to extract {C}%s{O} to {G}%s{O},Waiting or {R}Ctrl+C{O} Interrupt{W}"
+                 stdout=PIPE, stderr=PIPE, universal_newlines=True)
+    print(color("{+} {O}Starting extract {C}%s{O} to {G}%s{O},Waiting or {R}Ctrl+C{O} Interrupt{W}"
                 % (backup, mount_point)))
     try:
         while proc.poll() == None:
-            stdout = proc.stdout.readline().strip()
+            stdout = proc.stdout.readline().rstrip()
             if stdout:
                 if len(stdout) > 50:
-                    stdout = stdout[0:48] + '...'
-                sys.stdout.write(
-                    color("\r{+} {O}Extracting: {C}%-50s{W}" % (stdout)))
-                sys.stdout.flush()
+                    stdout = stdout[0:47] + '...'
+                print(color(
+                    "\r{+} {O}Extracting: {C}%-50s{W}" % (stdout)), end='')
     except KeyboardInterrupt:
         proc.send_signal(signal.SIGINT)
         print(color("\n{!} {R}(^C) {O}Control-C Interrupt{W}"))
         exit(1)
+    print(
+        color("\n{+} {O}Starting rewrite {G}%s/etc/fstab{O} file.{W}" % (mount_point)))
     with open('%s/etc/fstab' % (mount_point), 'w') as f:
         f.write(
             "# <file system> <mount point>   <type>  <options>       <dump>  <pass>\n")
         if dev.efi_flag:
+            if not os.path.exists('%s/boot/efi' % (mount_point)):
+                os.makedirs('%s/boot/efi' % (mount_point))
             proc = run(['mount', disk + '1', '%s/boot/efi' % (mount_point)])
+            if proc.returncode != 0:
+                for mount_disk in mount_list:
+                    proc = run(['umount', mount_disk])
+                exit(1)
+            mount_list.insert(0, disk + '1')
             f.write("# / was on /dev/sda2 during installation\n")
             f.write(
                 "UUID=%s /               ext4    errors=remount-ro 0       1\n" % (dev.sys_uuid))
@@ -214,6 +226,8 @@ def system_recovery(disk, backup, mount_point='/mnt'):
                 "UUID=%s /               ext4    errors=remount-ro 0       1\n" % (dev.root_uuid))
         f.write("/swapfile   none            swap    sw              0       0\n")
     install_grub(disk, mount_point)
+    for mount_disk in mount_list:
+        proc = run(['umount', mount_disk])
 
 
 def main():
