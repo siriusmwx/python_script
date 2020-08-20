@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 import os
+import re
 import signal
 import argparse
 from subprocess import Popen, run, PIPE, DEVNULL
@@ -49,11 +50,15 @@ class Disk:
     def __init__(self, disk):
         self.disk = disk[5:]
         self.disk_path = os.path.join('/sys/block', self.disk)
-        self.dev_path = disk
+        self.device = disk
         self.get_disk_info()
         self.efi_flag = False
         if os.path.exists('/sys/firmware/efi'):
             self.efi_flag = True
+        self.mount_info = {}
+        self.get_mount_info()
+        if self.mount_info:
+            self.umount_all()
 
     def get_disk_info(self):
         with open(os.path.join(self.disk_path, 'size')) as f:
@@ -63,6 +68,57 @@ class Disk:
         self.size = '%.2f' % (
             self.block * self.logical_block_byte / 1073741824)
 
+    def get_mount_info(self):
+        proc = run(['df'], stdout=PIPE, stderr=DEVNULL,
+                   universal_newlines=True)
+        mount_infos = proc.stdout.rstrip().split('\n')
+        for mount_info in mount_infos:
+            match = re.search(self.device + '[0-9]+', mount_info, re.I)
+            if match:
+                info = mount_info.split()
+                self.mount_info[info[0]] = info[-1]
+
+    def umount_all(self):
+        mount_list = list(self.mount_info.items())
+        mount_list = sorted(mount_list, key=lambda x: x[
+                            1].count('/'), reverse=True)
+        device_list = [x[0] for x in mount_list]
+        for device in device_list:
+            self.umount_device(device)
+
+    def mount_device(self, device, mount_point):
+        if device not in self.mount_info or self.mount_info[device] == None:
+            proc = run(['mount', device, mount_point],
+                       stdout=DEVNULL, stderr=DEVNULL)
+            if proc.returncode == 0:
+                print(color('{+} {G}Success{O} to mount {C}%s{W} to {G}%s{W}.'
+                            % (device, mount_point)))
+                self.mount_info[device] = mount_point
+                return True
+            else:
+                print(
+                    color('{!} {R}Fail{O} to mount {C}%s{W} to {G}%s{W}.'
+                          % (device, mount_point)))
+                exit(1)
+        else:
+            print(color('{!} {C}%s{O} has mounted on {G}%s{O}!{W}'
+                        % (device, self.mount_info[device])))
+
+    def umount_device(self, device):
+        if device in self.mount_info and self.mount_info[device] != None:
+            proc = run(['umount', device], stdout=DEVNULL, stderr=DEVNULL)
+            if proc.returncode == 0:
+                print(
+                    color('{+} {G}Success{O} to umount {C}%s{O} from {G}%s{W}.'
+                          % (device, self.mount_info[device])))
+                self.mount_info[device] = None
+            else:
+                print(color('{!} {R}Fail{O} to umount {C}%s{O} from {G}%s{W}.'
+                            % (device, self.mount_info[device])))
+                exit(1)
+        else:
+            print(color('{!} {C}%s{O} does not mounted!{W}' % (device)))
+
     def _gpt_partion(self):
         print(color(
             "{+} {O}Starting covert {C}%s{O} to {G}GPT{O} Partition,please waiting...{W}" % (self.disk)))
@@ -70,8 +126,7 @@ class Disk:
         efi_part_in_byte = 134217728
         end_sector = (efi_part_in_byte //
                       self.logical_block_byte) - 1 + start_sector
-        proc = run(['umount', self.dev_path + '*'])
-        proc = Popen(['fdisk', self.dev_path], stdin=PIPE,
+        proc = Popen(['fdisk', self.device], stdin=PIPE,
                      stdout=DEVNULL, stderr=DEVNULL, universal_newlines=True)
         proc.communicate(
             'g\nn\n\n\n%s\nn\n\n\n\nt\n1\n1\nt\n2\n20\nw\n' % (end_sector))
@@ -84,8 +139,9 @@ class Disk:
             exit(1)
         print(color(
             "{+} {O}Starting format {C}%s{O} to {G}Fat32{O} Partition,waiting...{W}" % (self.disk + '1')))
-        proc = run(['umount', self.dev_path + '1'])
-        proc = Popen(['mkfs.vfat', self.dev_path + '1'],
+        self.get_mount_info()
+        self.umount_device(self.device + '1')
+        proc = Popen(['mkfs.vfat', self.device + '1'],
                      stdin=PIPE, stdout=DEVNULL, stderr=DEVNULL)
         proc.communicate(b'y\n')
         if proc.returncode == 0:
@@ -95,12 +151,12 @@ class Disk:
             print(color(
                 "{!} {R}Failed{O} to format {C}%s{O} to {G}Fat32{O} filesystem.{W}" % (self.disk + '1')))
             exit(1)
-        self.efi_uuid = run(['grub-probe', '--device', self.dev_path + '1', '--target=fs_uuid'],
+        self.efi_uuid = run(['grub-probe', '--device', self.device + '1', '--target=fs_uuid'],
                             stdout=PIPE, universal_newlines=True).stdout.strip()
         print(color(
             "{+} {O}Starting format {C}%s{O} to {G}Ext4{O} Partition,waiting...{W}" % (self.disk + '2')))
-        proc = run(['umount', self.dev_path + '2'])
-        proc = Popen(['mkfs.ext4', self.dev_path + '2', '-L', 'SYSTEM'],
+        self.umount_device(self.device + '2')
+        proc = Popen(['mkfs.ext4', self.device + '2', '-L', 'SYSTEM'],
                      stdin=PIPE, stdout=DEVNULL, stderr=DEVNULL)
         proc.communicate(b'y\n')
         if proc.returncode == 0:
@@ -110,14 +166,13 @@ class Disk:
             print(color(
                 "{!} {R}Failed{O} to format {C}%s{O} to {G}Ext4{O} filesystem.{W}" % (self.disk + '2')))
             exit(1)
-        self.sys_uuid = run(['grub-probe', '--device', self.dev_path + '2', '--target=fs_uuid'],
+        self.sys_uuid = run(['grub-probe', '--device', self.device + '2', '--target=fs_uuid'],
                             stdout=PIPE, universal_newlines=True).stdout.strip()
 
     def _dos_partion(self):
         print(color(
             "{+} {O}Starting covert {C}%s{O} to {G}DOS{O} Partition,please waiting...{W}" % (self.disk)))
-        proc = run(['umount', self.dev_path + '*'])
-        proc = Popen(['fdisk', self.dev_path], stdin=PIPE,
+        proc = Popen(['fdisk', self.device], stdin=PIPE,
                      stdout=DEVNULL, stderr=DEVNULL, universal_newlines=True)
         proc.communicate('o\nn\np\n\n\n\nt\n83\na\nw\n')
         if proc.returncode == 0:
@@ -129,8 +184,9 @@ class Disk:
             exit(1)
         print(color(
             "{+} {O}Starting format {C}%s{O} to {G}Ext4{O} Partition,waiting...{W}" % (self.disk + '1')))
-        proc = run(['umount', self.dev_path + '1'])
-        proc = Popen(['mkfs.ext4', self.dev_path + '1', '-L', 'SYSTEM'],
+        self.get_mount_info()
+        self.umount_device(self.device + '1')
+        proc = Popen(['mkfs.ext4', self.device + '1', '-L', 'SYSTEM'],
                      stdin=PIPE, stdout=DEVNULL, stderr=DEVNULL)
         proc.communicate(b'y\n')
         if proc.returncode == 0:
@@ -140,7 +196,7 @@ class Disk:
             print(color(
                 "{!} {R}Failed{O} to format {C}%s{O} to {G}Ext4{O} filesystem.{W}" % (self.disk + '1')))
             exit(1)
-        self.root_uuid = run(['grub-probe', '--device', self.dev_path + '1', '--target=fs_uuid'],
+        self.root_uuid = run(['grub-probe', '--device', self.device + '1', '--target=fs_uuid'],
                              stdout=PIPE, universal_newlines=True).stdout.strip()
 
     def creat_partiton(self):
@@ -171,19 +227,12 @@ def install_grub(disk, mount_point):
 def system_recovery(disk, backup, mount_point='/mnt'):
     if not os.path.exists(mount_point):
         os.makedirs(mount_point)
-    dev = Disk(disk)
-    dev.creat_partiton()
-    # proc = run(['umount', disk + '*'])
-    if dev.efi_flag:
-        proc = run(['mount', disk + '2', mount_point])
-        if proc.returncode != 0:
-            exit(1)
-        mount_list = [disk + '2']
+    device = Disk(disk)
+    device.creat_partiton()
+    if device.efi_flag:
+        device.mount_device(disk + '2', mount_point)
     else:
-        proc = run(['mount', disk + '1', mount_point])
-        if proc.returncode != 0:
-            exit(1)
-        mount_list = [disk + '1']
+        device.mount_device(disk + '1', mount_point)
     proc = Popen(['tar', '-xvpzf', backup, '-C', mount_point],
                  stdout=PIPE, stderr=PIPE, universal_newlines=True)
     print(color("{+} {O}Starting extract {C}%s{O} to {G}%s{O},Waiting or {R}Ctrl+C{O} Interrupt{W}"
@@ -199,35 +248,30 @@ def system_recovery(disk, backup, mount_point='/mnt'):
     except KeyboardInterrupt:
         proc.send_signal(signal.SIGINT)
         print(color("\n{!} {R}(^C) {O}Control-C Interrupt{W}"))
+        device.umount_all()
         exit(1)
     print(
         color("\n{+} {O}Starting rewrite {G}%s/etc/fstab{O} file.{W}" % (mount_point)))
     with open('%s/etc/fstab' % (mount_point), 'w') as f:
         f.write(
             "# <file system> <mount point>   <type>  <options>       <dump>  <pass>\n")
-        if dev.efi_flag:
+        if device.efi_flag:
             if not os.path.exists('%s/boot/efi' % (mount_point)):
                 os.makedirs('%s/boot/efi' % (mount_point))
-            proc = run(['mount', disk + '1', '%s/boot/efi' % (mount_point)])
-            if proc.returncode != 0:
-                for mount_disk in mount_list:
-                    proc = run(['umount', mount_disk])
-                exit(1)
-            mount_list.insert(0, disk + '1')
+            device.mount_device(disk + '1', '%s/boot/efi' % (mount_point))
             f.write("# / was on /dev/sda2 during installation\n")
             f.write(
-                "UUID=%s /               ext4    errors=remount-ro 0       1\n" % (dev.sys_uuid))
+                "UUID=%s /               ext4    errors=remount-ro 0       1\n" % (device.sys_uuid))
             f.write("# /boot/efi was on /dev/sda1 during installation\n")
             f.write(
-                "UUID=%s  /boot/efi       vfat    umask=0077      0       1\n" % (dev.efi_uuid))
+                "UUID=%s  /boot/efi       vfat    umask=0077      0       1\n" % (device.efi_uuid))
         else:
             f.write("# / was on /dev/sda1 during installation\n")
             f.write(
-                "UUID=%s /               ext4    errors=remount-ro 0       1\n" % (dev.root_uuid))
+                "UUID=%s /               ext4    errors=remount-ro 0       1\n" % (device.root_uuid))
         f.write("/swapfile   none            swap    sw              0       0\n")
     install_grub(disk, mount_point)
-    for mount_disk in mount_list:
-        proc = run(['umount', mount_disk])
+    device.umount_all()
 
 
 def main():
