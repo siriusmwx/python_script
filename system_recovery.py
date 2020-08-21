@@ -71,53 +71,63 @@ class Disk:
     def get_mount_info(self):
         proc = run(['df'], stdout=PIPE, stderr=DEVNULL,
                    universal_newlines=True)
-        mount_infos = proc.stdout.rstrip().split('\n')
+        mount_infos = proc.stdout.strip().split('\n')
+        pattern = re.compile('^(%s\\d+)[ ].*[ ](/\\w*)$' % self.device, re.I)
         for mount_info in mount_infos:
-            match = re.search(self.device + '[0-9]+', mount_info, re.I)
+            match = re.search(pattern, mount_info)
             if match:
-                info = mount_info.split()
-                self.mount_info[info[0]] = info[-1]
+                self.mount_info[match.group(1)] = match.group(2)
 
     def umount_all(self):
-        mount_list = list(self.mount_info.items())
-        mount_list = sorted(mount_list, key=lambda x: x[
-                            1].count('/'), reverse=True)
+        mount_list = sorted(self.mount_info.items(),
+                            key=lambda x: x[1].count('/'), reverse=True)
         device_list = [x[0] for x in mount_list]
         for device in device_list:
             self.umount_device(device)
 
     def mount_device(self, device, mount_point):
-        if device not in self.mount_info or self.mount_info[device] == None:
-            proc = run(['mount', device, mount_point],
-                       stdout=DEVNULL, stderr=DEVNULL)
-            if proc.returncode == 0:
+        if device not in self.mount_info:
+            if self.mount(device, mount_point):
                 print(color('{+} {G}Success{O} to mount {C}%s{W} to {G}%s{W}.'
                             % (device, mount_point)))
                 self.mount_info[device] = mount_point
-                return True
             else:
-                print(
-                    color('{!} {R}Fail{O} to mount {C}%s{W} to {G}%s{W}.'
-                          % (device, mount_point)))
+                print(color('{!} {R}Fail{O} to mount {C}%s{W} to {G}%s{W}.'
+                            % (device, mount_point)))
                 exit(1)
         else:
             print(color('{!} {C}%s{O} has mounted on {G}%s{O}!{W}'
                         % (device, self.mount_info[device])))
 
     def umount_device(self, device):
-        if device in self.mount_info and self.mount_info[device] != None:
-            proc = run(['umount', device], stdout=DEVNULL, stderr=DEVNULL)
-            if proc.returncode == 0:
-                print(
-                    color('{+} {G}Success{O} to umount {C}%s{O} from {G}%s{W}.'
-                          % (device, self.mount_info[device])))
-                self.mount_info[device] = None
+        if device in self.mount_info:
+            if self.umount(device):
+                print(color('{+} {G}Success{O} to umount {C}%s{O} from {G}%s{W}.'
+                            % (device, self.mount_info[device])))
+                del self.mount_info[device]
             else:
                 print(color('{!} {R}Fail{O} to umount {C}%s{O} from {G}%s{W}.'
                             % (device, self.mount_info[device])))
                 exit(1)
         else:
             print(color('{!} {C}%s{O} does not mounted!{W}' % (device)))
+
+    @staticmethod
+    def mount(device, mount_point):
+        proc = run(['mount', device, mount_point],
+                   stdout=DEVNULL, stderr=DEVNULL)
+        if proc.returncode == 0:
+            return True
+        else:
+            return False
+
+    @staticmethod
+    def umount(device):
+        proc = run(['umount', device], stdout=DEVNULL, stderr=DEVNULL)
+        if proc.returncode == 0:
+            return True
+        else:
+            return False
 
     def _gpt_partion(self):
         print(color(
