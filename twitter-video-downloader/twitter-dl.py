@@ -2,25 +2,25 @@
 import re
 import json
 import m3u8
-import ffmpeg
 import shutil
 import argparse
 import requests
 import urllib.parse
 from pathlib import Path
+from subprocess import run
 
 
 class TwitterDownloader:
     """
     tw-dl offers the ability to download videos from Twitter feeds.
     """
+    tweet_data = {}
     video_player_prefix = 'https://twitter.com/i/videos/tweet/'
     video_api = 'https://api.twitter.com/1.1/videos/tweet/config/'
-    tweet_data = {}
 
     def __init__(self, tweet_url, output_dir='output', debug=0):
         """
-        We split on ? to clean up the URL. Sharing tweets, for example, 
+        We split on ? to clean up the URL. Sharing tweets, for example,
         will add ? with data about which device shared it.
         The rest is just getting the user and ID to work with.
         """
@@ -34,8 +34,8 @@ class TwitterDownloader:
         self.storage_dir = str(storage_dir)
 
         self.request = requests.Session()
-        # self.request.proxies = {
-        #     'http': 'socks5://127.0.0.1:1080', 'https': 'socks5://127.0.0.1:1080'}
+        # self.request.proxies = {'http': 'socks5://127.0.0.1:1080',
+        #                         'https': 'socks5://127.0.0.1:1080'}
 
     def download(self):
         self.__debug('Tweet URL', self.tweet_data['tweet_url'])
@@ -45,51 +45,55 @@ class TwitterDownloader:
 
         # Get the M3u8 file - this is where rate limiting has been happening
         video_host, playlist = self.__get_playlist(token)
-
         if playlist.is_variant:
-            print('[+] %s resolutions found. Slurping all resolutions.' %
-                  len(playlist.playlists))
-            self.__parse_videos(video_host, playlist)
+            playlists = playlist.playlists
+            playlists.sort(
+                key=lambda p: p.stream_info.resolution[0], reverse=True)
+            resolution = playlists[0].stream_info.resolution
+            print('[+] %s resolutions found. Slurping %sx%s resolution.' %
+                  (len(playlists), resolution[0], resolution[1]))
+            self.__parse_videos(video_host, playlists[0])
         else:
             print('[!] Sorry, single resolution video download is not yet implemented.')
             print('    Please submit a bug report with the link to the tweet.')
 
     def __parse_videos(self, video_host, playlist):
-        for plist in playlist.playlists:
-            playlist_url = video_host + plist.uri
-            match = re.search(
-                '/([^/]+)/([^/]+).m3u8', playlist_url)
-            resolution = match.group(2) + '_' + match.group(1)
-            resolution_file = str(Path(self.storage_dir) /
-                                  Path(resolution + '.mp4'))
-            ts_full_file = str(Path(self.storage_dir) /
-                               Path(resolution + '.ts'))
+        playlist_url = video_host + playlist.uri
+        match = re.search(
+            '/([^/]+)/([^/]+).m3u8', playlist_url)
+        video_name = match.group(2) + '_' + match.group(1)
+        video_file = str(Path(self.storage_dir) /
+                         Path(video_name + '.mp4'))
+        ts_full_file = str(Path(self.storage_dir) /
+                           Path(video_name + '.ts'))
 
-            print('[+] Downloading ' + resolution + '.mp4')
-            resp = self.request.get(
-                playlist_url, headers={'Authorization': None})
-            ts_m3u8_parse = m3u8.loads(resp.text)
-            ts_list = []
-            for ts_uri in ts_m3u8_parse.segments.uri:
-                ts_file = self.request.get(video_host + ts_uri)
-                fname = ts_uri.split('/')[-1]
-                ts_path = Path(self.storage_dir) / Path(fname)
-                ts_list.append(ts_path)
-                ts_path.write_bytes(ts_file.content)
+        print('[+] Downloading ' + video_name + '.mp4')
+        resp = self.request.get(
+            playlist_url, headers={'Authorization': None})
+        ts_m3u8_parse = m3u8.loads(resp.text)
+        ts_list = []
+        for ts_uri in ts_m3u8_parse.segments.uri:
+            ts_file = self.request.get(video_host + ts_uri)
+            fname = ts_uri.split('/')[-1]
+            ts_path = Path(self.storage_dir) / Path(fname)
+            ts_list.append(ts_path)
+            ts_path.write_bytes(ts_file.content)
 
-            with open(ts_full_file, 'wb') as wfd:
-                for f in ts_list:
-                    with open(f, 'rb') as fd:
-                        shutil.copyfileobj(fd, wfd, 1024 * 1024 * 10)
+        with open(ts_full_file, 'wb') as wfd:
+            for f in ts_list:
+                with open(f, 'rb') as fd:
+                    shutil.copyfileobj(fd, wfd, 1024 * 1024 * 10)
 
-            print('\t[*] Doing the magic ...')
-            ffmpeg.input(ts_full_file).output(
-                resolution_file, acodec='copy', vcodec='libx264',
-                format='mp4', loglevel='error').overwrite_output().run()
+        print('\t[*] Doing the magic ...')
+        # cmd = 'ffmpeg -y -i %s -c:v libx264 -c:a copy -bsf:a aac_adtstoasc %s' % (
+        #     ts_full_file, video_file)
+        cmd = 'ffmpeg -y -i %s -acodec copy -vcodec copy -f mp4 %s' % (
+            ts_full_file, video_file)
+        proc = run(cmd, capture_output=True, shell=True)
 
-            print('\t[+] Doing cleanup...')
-            [Path(ts).unlink() for ts in ts_list]
-            Path(ts_full_file).unlink()
+        print('\t[+] Doing cleanup...')
+        [Path(ts).unlink() for ts in ts_list]
+        Path(ts_full_file).unlink()
 
     def __get_bearer_token(self):
         video_player_url = self.video_player_prefix + self.tweet_data['id']
