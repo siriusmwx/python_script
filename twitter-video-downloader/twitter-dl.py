@@ -166,8 +166,11 @@ class TwitterDownloader:
 def main():
     parser = argparse.ArgumentParser(
         description='Download Twitter video streams')
-    parser.add_argument('tweet_url',
-                        help='The twitter video URL(https://twitter.com/<user>/status/<id>).')
+    url_parser = parser.add_mutually_exclusive_group()
+    url_parser.add_argument('--url', metavar='twitter_url',
+                            help='The twitter_video_url(https://twitter.com/<user>/status/<id>).')
+    url_parser.add_argument('--url_list', metavar='url.txt',
+                            help='The file with the url lists of the twitter videos')
     parser.add_argument('-o', '--output', default='output',
                         help='The directory to download videos.(<output>/<user>/)')
     parser.add_argument('-d', '--debug', choices=[0, 1, 2], default=1, type=int,
@@ -175,9 +178,20 @@ def main():
     parser.add_argument('-p', '--proxy', action='store_true',
                         help='Download video with socks5 proxy,default=127.0.0.1:1080.')
     args = parser.parse_args()
-    twitter_dl = TwitterDownloader(
-        args.tweet_url, args.output, args.debug, args.proxy)
-    twitter_dl.download()
+    if args.url:
+        twitter_dl = TwitterDownloader(
+            args.url, args.output, args.debug, args.proxy)
+        twitter_dl.download()
+    elif args.url_list:
+        with open(args.url_list) as f:
+            for url in f:
+                if url.rstrip():
+                    twitter_dl = TwitterDownloader(
+                        url.rstrip(), args.output, args.debug, args.proxy)
+                    twitter_dl.download()
+    else:
+        parser.print_help()
+
 
 if __name__ == '__main__':
     main()
