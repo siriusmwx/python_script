@@ -104,11 +104,11 @@ if __name__ == '__main__':
     key_button.grid(row=1, column=40, padx=1, columnspan=8)
     enc_txt = Text(window, show=None, font=('Arial', 14), width=21, height=10)
     enc_txt.grid(row=2, column=0, rowspan=2, columnspan=21)
-    enc_button = Button(text='加密==>', font=('Arial', 12), command=enc_msg,
-                        width=5)
+    enc_button = Button(text='加密==>', font=('Arial', 12),
+                        command=enc_msg, width=5)
     enc_button.grid(row=2, column=21, columnspan=5)
-    dec_button = Button(text='<==解密', font=('Arial', 12), command=dec_msg,
-                        width=5, height=1)
+    dec_button = Button(text='<==解密', font=('Arial', 12),
+                        command=dec_msg, width=5)
     dec_button.grid(row=3, column=21, columnspan=5)
     dec_txt = Text(window, show=None, font=('Arial', 14), width=21, height=10)
     dec_txt.grid(row=2, column=26, rowspan=2, columnspan=21)
