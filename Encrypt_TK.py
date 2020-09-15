@@ -72,7 +72,7 @@ def set_key():
 
 
 def enc_msg():
-    message = enc_txt.get('0.0', 'end')
+    message = enc_txt.get('0.0', 'end').rstrip()
     enc_txt.delete('0.0', 'end')
     ciphertext = Encryptor.encrypt(message.encode())
     print(ciphertext)
@@ -81,7 +81,7 @@ def enc_msg():
 
 
 def dec_msg():
-    message = dec_txt.get('0.0', 'end')
+    message = dec_txt.get('0.0', 'end').rstrip()
     dec_txt.delete('0.0', 'end')
     plaintext = Encryptor.decrypt(message.encode())
     print(plaintext)
@@ -90,26 +90,25 @@ def dec_msg():
 
 if __name__ == '__main__':
     window = Tk()
-    window.title('PyEncryptor')
-
-    title_label = Label(window, text='加解密小工具', bg='gray',
-                        font=('Arial', 14), width=50)
-    title_label.grid(row=0, columnspan=50)
-    key_label = Label(window, text='password', bg='green',
-                      font=('Arial', 14), width=12)
-    key_label.grid(row=1, columnspan=12)
-    key = Entry(window, show='*', font=('Arial', 14), width=28)
-    key.grid(row=1, column=12, columnspan=28)
-    key_button = Button(text='设置密码', font=('Arial', 12), command=set_key)
-    key_button.grid(row=1, column=40, padx=1, columnspan=8)
-    enc_txt = Text(window, show=None, font=('Arial', 14), width=21, height=10)
-    enc_txt.grid(row=2, column=0, rowspan=2, columnspan=21)
-    enc_button = Button(text='加密==>', font=('Arial', 12),
-                        command=enc_msg, width=5)
-    enc_button.grid(row=2, column=21, columnspan=5)
-    dec_button = Button(text='<==解密', font=('Arial', 12),
-                        command=dec_msg, width=5)
-    dec_button.grid(row=3, column=21, columnspan=5)
-    dec_txt = Text(window, show=None, font=('Arial', 14), width=21, height=10)
-    dec_txt.grid(row=2, column=26, rowspan=2, columnspan=21)
+    window.title('加密解密小工具')
+    frame = Frame(window)
+    frame.pack()
+    Label(frame, text='说明：先输入密钥，再点击<设置密钥>设置密钥',
+          font=('Arial', 14)).grid(columnspan=50, ipady=3, sticky='news')
+    Label(frame, text='PassWord', bg='green',
+          font=('Arial', 14)).grid(columnspan=12, sticky='news')
+    key = Entry(frame, show='*', font=('Arial', 14))
+    key.grid(row=1, column=12, columnspan=30, sticky='news')
+    Button(frame, text='设置密钥', font=('Arial', 12), bg='gray', fg='blue',
+           command=set_key).grid(row=1, column=42, columnspan=8, sticky='news')
+    enc_txt = Text(frame, show=None, font=('Arial', 14), width=20, height=10)
+    enc_txt.grid(row=2, rowspan=2, columnspan=22,
+                 padx=2, pady=2, sticky='news')
+    Button(frame, text='加密==>', font=('Arial', 10), bg='orange',
+           command=enc_msg).grid(row=2, column=22, columnspan=6, sticky='ew')
+    Button(frame, text='<==解密', font=('Arial', 10), bg='orange',
+           command=dec_msg).grid(row=3, column=22, columnspan=6, sticky='ew')
+    dec_txt = Text(frame, show=None, font=('Arial', 14), width=20, height=10)
+    dec_txt.grid(row=2, column=28, rowspan=2,
+                 columnspan=22, padx=2, pady=2, sticky='news')
     window.mainloop()
