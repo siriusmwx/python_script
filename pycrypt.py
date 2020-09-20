@@ -76,6 +76,10 @@ class RSA_Cryptor:
 
     public_key = b''
     private_key = b''
+    try:
+        Import_Key = RSA.import_key
+    except AttributeError:
+        Import_Key = RSA.importKey
 
     @classmethod
     def gen_key(cls):
@@ -91,7 +95,7 @@ class RSA_Cryptor:
     def encrypt(cls, data):
         if not cls.public_key:
             return
-        recipient_key = RSA.importKey(cls.public_key)
+        recipient_key = cls.Import_Key(cls.public_key)
         cipher_rsa = PKCS1_OAEP.new(recipient_key)
         return b64encode(cipher_rsa.encrypt(data))
 
@@ -99,7 +103,7 @@ class RSA_Cryptor:
     def decrypt(cls, cipherdata):
         if not cls.private_key:
             return
-        key = RSA.importKey(cls.private_key)
+        key = cls.Import_Key(cls.private_key)
         cipher_rsa = PKCS1_OAEP.new(key)
         return cipher_rsa.decrypt(b64decode(cipherdata))
 
@@ -107,7 +111,7 @@ class RSA_Cryptor:
     def sign(cls, data):
         if not cls.private_key:
             return
-        key = RSA.importKey(cls.private_key)
+        key = cls.Import_Key(cls.private_key)
         _hash = SHA256.new(data)
         signature = PKCS1_PSS.new(key).sign(_hash)
         return b64encode(signature)
@@ -116,7 +120,7 @@ class RSA_Cryptor:
     def verify(cls, data, signature):
         if not cls.public_key:
             return
-        key = RSA.importKey(cls.public_key)
+        key = cls.Import_Key(cls.public_key)
         _hash = SHA256.new(data)
         signature = b64decode(signature)
         return PKCS1_PSS.new(key).verify(_hash, signature)
