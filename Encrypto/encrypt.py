@@ -85,10 +85,18 @@ def main():
             print_help(basename)
     elif args.Enc:
         load_keys(args.load)
+        if not RSA_Cryptor.public_key:
+            print('Please make sure the public.pem file was in the keys dir')
+            print('Or use --load option to specify a dir contains public_key file')
+            exit(1)
         cipherdata = RSA_Cryptor.encrypt(args.Enc.encode()).decode()
         print(cipherdata)
     elif args.Dec:
         load_keys(args.load)
+        if not RSA_Cryptor.private_key:
+            print('Please make sure the private.key file was in the keys dir')
+            print('Or use --load option to specify a dir contains private_key file')
+            exit(1)
         plaindata = RSA_Cryptor.decrypt(args.Dec.encode()).decode()
         print(plaindata)
     elif args.dump:

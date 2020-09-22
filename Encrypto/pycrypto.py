@@ -1,5 +1,4 @@
 #!/usr/bin/python3
-import os
 from Crypto import Random
 from Crypto.Hash import SHA256
 from Crypto.PublicKey import RSA
@@ -124,25 +123,3 @@ class RSA_Cryptor:
         _hash = SHA256.new(data)
         signature = b64decode(signature)
         return PKCS1_PSS.new(key).verify(_hash, signature)
-
-    @classmethod
-    def save_key(cls, path='keys'):
-        if not os.path.exists(path):
-            os.mkdir(path)
-        if cls.public_key:
-            with open(os.path.join(path, 'public.pem'), 'wb') as f:
-                f.write(cls.public_key)
-        if cls.private_key:
-            with open(os.path.join(path, 'private.key'), 'wb') as f:
-                f.write(cls.private_key)
-
-    @classmethod
-    def load_key(cls, path='keys'):
-        public_path = os.path.join(path, 'public.pem')
-        private_path = os.path.join(path, 'private.key')
-        if os.path.exists(public_path):
-            with open(os.path.join(path, 'public.pem'), 'rb') as f:
-                cls.public_key = f.read()
-        if os.path.exists(private_path):
-            with open(os.path.join(path, 'private.key'), 'rb') as f:
-                cls.private_key = f.read()
