@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 import argparse
-from tkinter import *
+import tkinter as tk
 from pathlib import Path
 from pycrypto import AES_Cryptor, RSA_Cryptor
 
@@ -26,15 +26,13 @@ def load_keys(path='keys'):
             RSA_Cryptor.private_key = f.read()
 
 
-class AES_Encrypt_TK:
+class AES_Encrypt_TK(tk.Tk):
 
     def __init__(self):
-        self.window = Tk()
-        self.window.title('AES加解密小工具')
-        self.frame = Frame(self.window)
-        self.frame.pack()
-        self.setup()
-        self.window.mainloop()
+        super().__init__()
+        self.title('AES加解密小工具')
+        self._setup()
+        self.mainloop()
 
     def set_key(self):
         password = self.key.get()
@@ -42,46 +40,58 @@ class AES_Encrypt_TK:
         print('KEY:', AES_Cryptor.key)
 
     def enc_msg(self):
-        message = self.enc_txt.get('0.0', 'end').rstrip()
+        message = self.enc_txt.get('1.0', 'end').rstrip()
         if not (message and AES_Cryptor.key):
             return
-        self.enc_txt.delete('0.0', 'end')
+        self.enc_txt.delete('1.0', 'end')
         ciphertext = AES_Cryptor.encrypt(message.encode())
         print('ENC_MSG:', ciphertext)
-        self.dec_txt.delete('0.0', 'end')
-        self.dec_txt.insert('0.0', ciphertext.decode())
+        self.dec_txt.delete('1.0', 'end')
+        self.dec_txt.insert('1.0', ciphertext.decode())
 
     def dec_msg(self):
-        message = self.dec_txt.get('0.0', 'end').rstrip()
+        message = self.dec_txt.get('1.0', 'end').rstrip()
         if not (message and AES_Cryptor.key):
             return
-        self.dec_txt.delete('0.0', 'end')
+        self.dec_txt.delete('1.0', 'end')
         plaintext = AES_Cryptor.decrypt(message.encode())
         print('DEC_MSG:', plaintext)
-        self.enc_txt.delete('0.0', 'end')
-        self.enc_txt.insert('0.0', plaintext.decode())
+        self.enc_txt.delete('1.0', 'end')
+        self.enc_txt.insert('1.0', plaintext.decode())
 
-    def setup(self):
-        Label(self.frame, text='先输入密钥，再点击<设置密钥>按钮', bg='gray',
-              font=('Arial', 14)).grid(columnspan=50, ipady=3, pady=2, sticky='news')
-        Label(self.frame, text='PassWord', bg='green',
-              font=('Arial', 14)).grid(columnspan=12, sticky='news')
-        self.key = Entry(self.frame, show='*', font=('Arial', 14))
+    def _setup(self):
+        tk.Label(self, text='先输入密钥，再点击<设置密钥>按钮', bg='yellow',
+                 font=('Arial', 14)).grid(columnspan=50, ipady=5, sticky='news')
+        tk.Label(self, text='PassWord', bg='green', pady=5,
+                 font=('Arial', 12)).grid(columnspan=12, sticky='ew')
+        self.key = tk.Entry(self, show='*', font=('Arial', 14))
         self.key.grid(row=1, column=12, columnspan=30, sticky='news')
-        Button(self.frame, text='设置密钥', font=('Arial', 12), bg='gray', fg='blue',
-               command=self.set_key).grid(row=1, column=42, columnspan=8, sticky='news')
-        self.enc_txt = Text(self.frame, show=None, font=(
-            'Arial', 14), width=20, height=10)
-        self.enc_txt.grid(row=2, rowspan=2, columnspan=22,
-                          padx=2, pady=2, sticky='news')
-        Button(self.frame, text='加密==>', font=('Arial', 10), bg='orange', height=2,
-               command=self.enc_msg).grid(row=2, column=22, columnspan=6, sticky='ew')
-        Button(self.frame, text='<==解密', font=('Arial', 10), bg='orange', height=2,
-               command=self.dec_msg).grid(row=3, column=22, columnspan=6, sticky='ew')
-        self.dec_txt = Text(self.frame, show=None, font=(
-            'Arial', 14), width=20, height=10)
-        self.dec_txt.grid(row=2, column=28, rowspan=2,
-                          columnspan=22, padx=2, pady=2, sticky='news')
+        tk.Button(self, text='设置密钥', font=('Arial', 12), bg='grey', fg='blue',
+                  command=self.set_key).grid(row=1, column=42, columnspan=8, sticky='news')
+        self.enc_frame = tk.Frame(self)
+        yscrollbar = tk.Scrollbar(self.enc_frame)
+        yscrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.enc_txt = tk.Text(self.enc_frame, show=None, font=('Arial', 12), bg='lightyellow',
+                               width=25, height=12, yscrollcommand=yscrollbar.set)
+        self.enc_txt.pack()
+        yscrollbar.configure(command=self.enc_txt.yview)
+        self.enc_txt.configure(exportselection=1)
+        self.enc_frame.grid(row=2, rowspan=2, columnspan=22,
+                            padx=2, pady=2, sticky='news')
+        tk.Button(self, text='加密==>', font=('Arial', 10), bg='orange', height=2,
+                  command=self.enc_msg).grid(row=2, column=22, columnspan=6, sticky='ew')
+        tk.Button(self, text='<==解密', font=('Arial', 10), bg='orange', height=2,
+                  command=self.dec_msg).grid(row=3, column=22, columnspan=6, sticky='ew')
+        self.dec_frame = tk.Frame(self)
+        yscrollbar = tk.Scrollbar(self.dec_frame)
+        yscrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.dec_txt = tk.Text(self.dec_frame, show=None, font=('Arial', 12), bg='lightyellow',
+                               width=25, height=12, yscrollcommand=yscrollbar.set)
+        self.dec_txt.pack()
+        yscrollbar.configure(command=self.dec_txt.yview)
+        self.dec_txt.configure(exportselection=1)
+        self.dec_frame.grid(row=2, column=28, rowspan=2, columnspan=22,
+                            padx=2, pady=2, sticky='news')
 
 
 def arg_parser():
