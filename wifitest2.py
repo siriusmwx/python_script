@@ -14,15 +14,39 @@ P = '\033[35m'  # purple
 C = '\033[36m'  # cyan
 GR = '\033[37m'  # gray
 
-status_code = {0: 'DISCONNETED', 1: 'SCANNING',
-               2: 'INACTIVE', 3: 'CONNECTING', 4: 'CONNECTED'}
-akm_name_value = {0: 'NONE', 1: 'WPA', 2: 'WPAPSK',
-                  3: 'WPA2', 4: 'WPA2PSK', 5: 'UNKNOWN'}
+status_code = {const.IFACE_DISCONNECTED: 'DISCONNETED',
+               const.IFACE_SCANNING: 'SCANNING',
+               const.IFACE_INACTIVE: 'INACTIVE',
+               const.IFACE_CONNECTING: 'CONNECTING',
+               const.IFACE_CONNECTED: 'CONNECTED'}
 
-ap_cipher = False
-if sys.platform == 'win32':
-    os.system('cls')
-    ap_cipher = True
+akm_name_value = {const.AKM_TYPE_NONE: 'NONE',
+                  const.AKM_TYPE_WPA: 'WPA',
+                  const.AKM_TYPE_WPAPSK: 'WPAPSK',
+                  const.AKM_TYPE_WPA2: 'WPA2',
+                  const.AKM_TYPE_WPA2PSK: 'WPA2PSK',
+                  const.AKM_TYPE_UNKNOWN: 'UNKNOWN'}
+
+
+def get_akm_name(ap):
+    akm_names = []
+    for a in ap.akm:
+        if a in akm_name_value.keys():
+            akm_names.append(akm_name_value[a])
+    if len(akm_names) == 0:
+        akm_names.append("OPEN")
+
+    return '/'.join(akm_names)
+
+
+def get_akm_cipher(ap):
+    akm_name = akm_name_value[ap.akm[-1]]
+    if 'WPA2' in akm_name:
+        return const.CIPHER_TYPE_CCMP
+    elif 'WPA' in akm_name:
+        return const.CIPHER_TYPE_TKIP
+    else:
+        return const.CIPHER_TYPE_NONE
 
 
 def get_wifi_interface():
@@ -53,17 +77,6 @@ def get_wifi_interface():
         exit(e.errno)
 
 
-def get_akm_name(akm_value):
-    akm_names = []
-    for a in akm_value:
-        if a in akm_name_value.keys():
-            akm_names.append(akm_name_value[a])
-    if len(akm_names) == 0:
-        akm_names.append("OPEN")
-
-    return '/'.join(akm_names)
-
-
 def wifi_scan(iface):
     print("-" * 73)
     print("%-2s   %-20s  %-20s   %-6s   %s" %
@@ -84,7 +97,7 @@ def wifi_scan(iface):
             power = R + "%-6s" % (ap.signal) + GR
         sys.stdout.write(G + "%-2s" % (i + 1) + GR + " | " + B + "%-19s" % (ssid) +
                          GR + " | " + P + "%-20s" % (ap.bssid.rstrip(':')) + GR + " | " +
-                         power + " | " + C + "%s\n" % (get_akm_name(ap.akm)) + W)
+                         power + " | " + C + "%s\n" % (get_akm_name(ap)) + W)
     sys.stdout.flush()
     return iface.scan_results()
 
@@ -97,8 +110,7 @@ class Wifi_Test():
         self.timeout = 30
         self.ap_id = ap.bssid.rstrip(':') if len(ap.ssid) == 0 \
             or ap.ssid == '\\x00' or len(ap.ssid) > len(ap.bssid) else ap.ssid
-        if ap_cipher:
-            self.ap.cipher = const.CIPHER_TYPE_CCMP
+        self.ap.cipher = get_akm_cipher(ap)
 
     def test(self, key):
         self.ap.key = key.strip('\r\n')
@@ -107,7 +119,7 @@ class Wifi_Test():
         start_time = time.time()
         while True:
             time.sleep(0.1)
-            self.code = self.iface.status()
+            code = self.iface.status()
             now_time = time.time() - start_time
             if now_time <= 5:
                 now = G + "%5.2fs" % (now_time)
@@ -119,18 +131,18 @@ class Wifi_Test():
                 break
             sys.stdout.write(B + "\r%-17s" % (self.ap_id) + GR + " | " + now + GR +
                              " | " + C + "%-20s" % (self.ap.key) + GR +
-                             " | " + P + "%-12s" % (status_code[self.code]) + W)
+                             " | " + P + "%-12s" % (status_code[code]) + W)
             sys.stdout.flush()
-            if self.code == const.IFACE_DISCONNECTED:
+            if code == const.IFACE_DISCONNECTED:
                 break
-            if self.code == const.IFACE_CONNECTED:
+            if code == const.IFACE_CONNECTED:
                 self.iface.disconnect()
                 sys.stdout.write(B + "\r%-17s" % (self.ap_id) + GR + " | " + now +
                                  GR + " | " + C + "%-20s" % (self.ap.key) +
                                  GR + " | " + B + "%-12s" % ("FOUND!") + W)
                 sys.stdout.flush()
                 return self.ap.key
-        if self.code == const.IFACE_DISCONNECTED and now_time < 1:
+        if code == const.IFACE_DISCONNECTED and now_time < 1:
             sys.stdout.write(B + "\r%-17s" % (self.ap_id) + GR + " | " + now +
                              GR + " | " + C + "%-20s" % (self.ap.key) + GR + " | " +
                              O + "%-12s" % ("BUSY!") + W)
@@ -141,6 +153,8 @@ class Wifi_Test():
 
 
 def main():
+    if sys.platform == 'win32':
+        os.system('cls')
     iface = get_wifi_interface()
     while True:
         scanres = wifi_scan(iface)
