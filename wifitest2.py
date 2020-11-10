@@ -53,8 +53,7 @@ def get_wifi_interface():
     wifi = PyWiFi()
     try:
         if len(wifi.interfaces()) <= 0:
-            print('No wifi inteface found!')
-            exit()
+            sys.exit('No wifi inteface found!')
         print("=" * 73)
         if len(wifi.interfaces()) == 1:
             print(O + 'Wifi interface found:' + C +
@@ -71,15 +70,15 @@ def get_wifi_interface():
                     return wifi.interfaces()[no]
     except FileNotFoundError as e:
         print(e.strerror + ":Please ensure you have a wireless lan")
-        exit(e.errno)
+        sys.exit(e.errno)
     except PermissionError as e:
         print(e.strerror + ":Please run this script as root")
-        exit(e.errno)
+        sys.exit(e.errno)
 
 
 def wifi_scan(iface):
     print("-" * 73)
-    print("%-2s   %-20s  %-20s   %-6s   %s" %
+    print("%-2s   %-19s   %-17s  %-6s  %s" %
           ('No', 'SSID', 'BSSID', 'SIGNAL', 'ENC/AUTH'))
     iface.scan()
     time.sleep(5)
@@ -90,13 +89,13 @@ def wifi_scan(iface):
         elif ssid == '\\x00':
             ssid = '<length: 1>'
         if int(ap.signal) >= -60:
-            power = G + "%-6s" % (ap.signal) + GR
+            power = G + "%-4s" % (ap.signal) + GR
         elif int(ap.signal) < -60 and int(ap.signal) >= -70:
-            power = O + "%-6s" % (ap.signal) + GR
+            power = O + "%-4s" % (ap.signal) + GR
         else:
-            power = R + "%-6s" % (ap.signal) + GR
-        sys.stdout.write(G + "%-2s" % (i + 1) + GR + " | " + B + "%-19s" % (ssid) +
-                         GR + " | " + P + "%-20s" % (ap.bssid.rstrip(':')) + GR + " | " +
+            power = R + "%-4s" % (ap.signal) + GR
+        sys.stdout.write(G + "%-2s" % (i + 1) + GR + " | " + B + "%-19s" % (ssid[0:19]) +
+                         GR + " | " + P + "%-17s" % (ap.bssid.rstrip(':')) + GR + " | " +
                          power + " | " + C + "%s\n" % (get_akm_name(ap)) + W)
     sys.stdout.flush()
     return iface.scan_results()
@@ -185,4 +184,6 @@ if __name__ == '__main__':
     try:
         main()
     except KeyboardInterrupt:
-        exit()
+        sys.exit()
+    except Exception as e:
+        sys.exit(e)
