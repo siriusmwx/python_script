@@ -51,29 +51,22 @@ def get_akm_cipher(ap):
 
 def get_wifi_interface():
     wifi = PyWiFi()
-    try:
-        if len(wifi.interfaces()) <= 0:
-            sys.exit('No wifi inteface found!')
-        print("=" * 73)
-        if len(wifi.interfaces()) == 1:
-            print(O + 'Wifi interface found:' + C +
-                  wifi.interfaces()[0].name() + W)
-            return wifi.interfaces()[0]
-        else:
-            print('%-4s   %s' % ('No', 'interface name'))
-            for i, w in enumerate(wifi.interfaces()):
-                print('%-4s   %s' % (i, w.name()))
-            while True:
-                iface_no = input('Please choose interface No:')
-                no = int(iface_no)
-                if no >= 0 and no < len(wifi.interfaces()):
-                    return wifi.interfaces()[no]
-    except FileNotFoundError as e:
-        print(e.strerror + ":Please ensure you have a wireless lan")
-        sys.exit(e.errno)
-    except PermissionError as e:
-        print(e.strerror + ":Please run this script as root")
-        sys.exit(e.errno)
+    if len(wifi.interfaces()) <= 0:
+        sys.exit('No wifi inteface found!')
+    print("=" * 73)
+    if len(wifi.interfaces()) == 1:
+        print(O + 'Wifi interface found:' + C +
+              wifi.interfaces()[0].name() + W)
+        return wifi.interfaces()[0]
+    else:
+        print('%-4s   %s' % ('No', 'interface name'))
+        for i, w in enumerate(wifi.interfaces()):
+            print('%-4s   %s' % (i, w.name()))
+        while True:
+            iface_no = input('Please choose interface No:')
+            no = int(iface_no)
+            if no >= 0 and no < len(wifi.interfaces()):
+                return wifi.interfaces()[no]
 
 
 def wifi_scan(iface):
@@ -82,7 +75,12 @@ def wifi_scan(iface):
           ('No', 'SSID', 'BSSID', 'SIGNAL', 'ENC/AUTH'))
     iface.scan()
     time.sleep(5)
-    for i, ap in enumerate(iface.scan_results()):
+    scan_result = {}
+    for ap in iface.scan_results():
+        scan_result[ap.bssid] = ap
+    aps = list(scan_result.values())
+    aps.sort(key=lambda x: x.signal, reverse=True)
+    for i, ap in enumerate(aps):
         ssid = ap.ssid
         if len(ssid) == 0:
             ssid = '<length: 0>'
@@ -98,7 +96,7 @@ def wifi_scan(iface):
                          GR + " | " + P + "%-17s" % (ap.bssid.rstrip(':')) + GR + " | " +
                          power + " | " + C + "%s\n" % (get_akm_name(ap)) + W)
     sys.stdout.flush()
-    return iface.scan_results()
+    return aps
 
 
 class Wifi_Test():
@@ -156,10 +154,10 @@ def main():
         os.system('cls')
     iface = get_wifi_interface()
     while True:
-        scanres = wifi_scan(iface)
+        aps = wifi_scan(iface)
         ap_num = int(input(O + '\nPlease choose test No:' + W))
-        if ap_num >= 1 and ap_num <= len(scanres) + 1:
-            ap = scanres[ap_num - 1]
+        if ap_num >= 1 and ap_num <= len(aps) + 1:
+            ap = aps[ap_num - 1]
             break
         else:
             continue
