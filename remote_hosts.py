@@ -40,9 +40,9 @@ def ping_ips():
     for ip in ip_list:
         t = threading.Thread(target=host_status, args=(ip,), daemon=True)
         t.start()
-        # while True:
-        #     if len(threading.enumerate()) < 50:
-        #         break
+        while True:
+            if len(threading.enumerate()) < 128:
+                break
     while len(threading.enumerate()) > 1 and time.time() - start_time <= 60:
         pass
 
@@ -238,6 +238,9 @@ if __name__ == '__main__':
     parser = arg_parser()
     args = parser.parse_args()
     os.system('cls')
+    if args.mac:
+        send_magic_packet(*args.mac, ip_address=args.i, port=args.p)
+        print(f"Send magic packet to {O}{' '.join(args.mac)}{W}.")
     active_ips = set()
     ip_header = ('.').join(get_host_ip().split('.')[0:3])
     csv_file = ip_header.replace('.', '_') + '.csv'
@@ -260,9 +263,6 @@ if __name__ == '__main__':
             print(f'Starting remote hosts to {O}power off{W}')
             for host in hosts:
                 host.remote_host(model=model)
-        elif args.mac:
-            send_magic_packet(
-                *args.mac, ip_address=args.i, port=args.p)
         update_csv(hosts)
     except KeyboardInterrupt:
         sys.exit()
