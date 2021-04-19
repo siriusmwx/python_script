@@ -19,7 +19,6 @@ class SSHConnection:
         self.port = port
         self.username = username
         self.pwd = password
-        self.__k = None
 
     def connect(self):
         transport = paramiko.Transport((self.host, self.port))
@@ -39,8 +38,8 @@ class SSHConnection:
 
     def upload(self, local_path, target_path):
         sftp = paramiko.SFTPClient.from_transport(self.__transport)
-        sftp.put(local_path, target_path, confirm=True)
-        sftp.chmod(target_path, 0o755)
+        sftp.put(local_path, target_path)
+        # sftp.chmod(target_path, 0o755)
 
     def download(self, target_path, local_path):
         sftp = paramiko.SFTPClient.from_transport(self.__transport)
@@ -48,8 +47,11 @@ class SSHConnection:
 
 
 if __name__ == '__main__':
-    client.connect()
-    stdout, stderr = client.run_cmd(r'df -h')
-    print(stdout)
-    print(stderr)
-    
+    client = SSHConnection('10.245.138.118', 'user', 'password')
+    try:
+        client.connect()
+        stdout, stderr = client.run_cmd(r'df -h')
+        client.upload(r"D:\upper.tar.gz", '/home/user/zxc.tar.gz')
+        client.download('/home/user/ccc.tar.gz', r"D:\zxc.tar.gz")
+    finally:
+        client.close()
