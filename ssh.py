@@ -46,6 +46,39 @@ class SSHConnection:
         sftp.get(target_path, local_path)
 
 
+class SSH_Client:
+    def __init__(self, hostname, username, password, port=22):
+        self.host = hostname
+        self.port = port
+        self.username = username
+        self.pwd = password
+        self.client = paramiko.SSHClient()
+        self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+    def connect(self):
+        self.client.connect(self.host,
+                            username=self.username,
+                            password=self.pwd)
+
+    def close(self):
+        self.client.close()
+
+    def run_cmd(self, cmd, timeout=0.5, env=None):
+        stdin, stdout, stderr = self.client.exec_command(cmd,
+                                                         timeout=timeout,
+                                                         environment=env)
+        return bytes_to_str(stdout.read()), bytes_to_str(stderr.read())
+
+    def upload(self, local_path, target_path):
+        sftp = self.client.open_sftp()
+        sftp.put(local_path, target_path)
+        # sftp.chmod(target_path, 0o755)
+
+    def download(self, target_path, local_path):
+        sftp = self.client.open_sftp()
+        sftp.get(target_path, local_path)
+
+
 if __name__ == '__main__':
     client = SSHConnection('10.245.138.118', 'user', 'password')
     try:
