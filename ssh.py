@@ -57,6 +57,7 @@ class SSH_Client:
 
     def connect(self):
         self.client.connect(self.host,
+                            port=self.port,
                             username=self.username,
                             password=self.pwd)
 
