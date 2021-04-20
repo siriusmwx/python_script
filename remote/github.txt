@@ -1,0 +1,22 @@
+2.获取git路径，在本地下载代码（换成自己fork分支的路径）
+git clone ssh://fork
+3.创建本地开发分支
+git checkout -b br_ADS_develop
+4.配置远程分支
+git remote add upstream ssh://master
+5.获取远程分支更新
+git fetch upstream
+6.将更新merge到本地
+git merge upstream/br_ADS_develop
+7.修改代码
+8.查看本地代码仓状态
+git status
+9.查看本地修改
+git diff xx(文件名)
+10.提交代码
+git add .
+git commit -am message
+11.推送代码到远程分支
+git push origin br_ADS_develop
+
+每次开发重复步骤5~11
