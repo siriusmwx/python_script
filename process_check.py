@@ -186,4 +186,4 @@ def main(ip, user, passwd):
 
 
 if __name__ == '__main__':
-    main('10.246.55.69', 'root', 'Huawei12#$')
+    main('127.0.0.1', 'root', 'passwd')
