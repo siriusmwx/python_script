@@ -81,7 +81,7 @@ class SSH_Client:
 
 
 if __name__ == '__main__':
-    client = SSHConnection('10.245.138.118', 'user', 'password')
+    client = SSHConnection('127.0.0.1', 'user', 'password')
     try:
         client.connect()
         stdout, stderr = client.run_cmd(r'df -h')
