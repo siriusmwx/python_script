@@ -2,26 +2,25 @@ import os
 import sys
 import time
 import math
-import yaml
-import json
 import requests
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 
 currend_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(currend_dir)
-map_dir = os.path.join(currend_dir, "map")
+style = "s"
+map_dir = os.path.join(currend_dir, f"{style}map")
 
 
-def download(x, y, z, path):
+def download(x, y, z):
     proxies = {
         "http": "socks5h://127.0.0.1:1080",
         "https": "socks5h://127.0.0.1:1080"
     }
     # url = f"https://khms0.google.com/kh/v=979?x={x}&y={y}&z={z}"
     # url = f"https://mt.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
-    url = f"http://www.google.com/maps/vt?lyrs=s@820&gl=cn&x={x}&y={y}&z={z}"
-    path = os.path.join(path, f"{z}{os.sep}{x}")
+    url = f"http://www.google.com/maps/vt?lyrs={style}@820&gl=cn&x={x}&y={y}&z={z}"
+    path = os.path.join(map_dir, f"{z}{os.sep}{x}")
     filepath = os.path.join(path, f"{y}.png")
     try:
         resp = requests.get(url, proxies=proxies, stream=True)
@@ -66,55 +65,59 @@ def convert_point(point):
     return f"{degree}°{minute:02}′{second:02.0f}″"
 
 
-def latlng_dec2rad(lt, rb):
-    decnum = [(lt[0] + rb[0]) / 2, (lt[1] + rb[1]) / 2]
-    if decnum[0] < 0:
+def latlng_dec2rad(ox):
+    if ox[0] < 0:
         x = "S"
     else:
         x = "N"
-    if decnum[1] < 0:
+    if ox[1] < 0:
         y = "W"
     else:
         y = "E"
-    return f"{convert_point(decnum[0])}{x} {convert_point(decnum[1])}{y}"
+    return f"{convert_point(ox[0])}{x} {convert_point(ox[1])}{y}"
 
 
-def modifyimage(img_path, txt):
-    if isinstance(txt, list):
-        txt = latlng_dec2rad(txt)
-    img = Image.open(img_path)
+def modifyimage(img, ox):
+    txt = latlng_dec2rad(ox)
+    # img = Image.open(img)
     draw = ImageDraw.Draw(img)
     imgsize = img.size
     draw_font = ImageFont.truetype('consola.ttf', imgsize[1] // 64)
     txtsize = draw_font.getbbox(txt)
     draw.rectangle(
         [txtsize[3], txtsize[3], txtsize[2] + txtsize[3], 2 * txtsize[3]],
-        fill=(0, 0, 0))
-    draw.text([txtsize[3], txtsize[3]], txt, font=draw_font, fill=(255, 0, 0))
-    img.save(img_path)
+        fill="black")
+    draw.text([txtsize[3], txtsize[3]], txt, font=draw_font, fill="orange")
 
 
-def merge(x1, y1, x2, y2, z, path):
+def merge(x1, y1, x2, y2, ox, z, mark=False):
     date = time.strftime('%Y%m%d_%H%M%S', time.localtime())
     row_list = list()
     for i in range(x1, x2 + 1):
         col_list = list()
         for j in range(y1, y2 + 1):
-            col_list.append(
-                Image.open(os.path.join(path,
-                                        f"{z}{os.sep}{i}{os.sep}{j}.png")))
+            img = Image.open(
+                os.path.join(map_dir, f"{z}{os.sep}{i}{os.sep}{j}.png"))
+            # print(img.mode)
+            if img.mode != "RGB":
+                img = img.convert("RGB")
+            col_list.append(img)
         k = np.vstack(col_list)
         row_list.append(k)
     img_path = os.path.join(currend_dir, f"{date}.jpg")
-    final_pic = Image.fromarray(np.hstack(row_list))
-    final_pic.save(img_path)
-    # modifyimage(img_path, font)
+    # final_img = Image.fromarray(255 * np.hstack(row_list).astype(np.uint8),
+    #                             mode="L")
+    final_img = Image.fromarray(np.hstack(row_list))
+    if mark:
+        modifyimage(final_img, ox)
+    # final_img.show()
+    final_img.save(img_path)
 
 
 def map_downloader(ox, zoom=17):
     x, y = lonlat2xyz(ox[0], ox[1], zoom)
-    x1, y1 = x - 9, y - 4
-    x2, y2 = x + 5, y + 3
+    x1, y1 = x - 8, y - 5
+    x2, y2 = x + 7, y + 4
     total = (x2 - x1 + 1) * (y2 - y1 + 1)
     print(x1, y1, zoom)
     print(x2, y2, zoom)
@@ -124,12 +127,13 @@ def map_downloader(ox, zoom=17):
             for j in range(y1, y2 + 1):
                 count += 1
                 print("{m}/{n}".format(m=count, n=total))
-                while not download(i, j, zoom, map_dir):
+                while not download(i, j, zoom):
                     time.sleep(5)
-        merge(x1, y1, x2, y2, zoom, map_dir)
+        merge(x1, y1, x2, y2, ox, zoom, mark=True)
     except KeyboardInterrupt:
         pass
 
 
 if __name__ == '__main__':
-    map_downloader([44.687319736755526, 33.57245422012606], 17)
+    ox = [50.589077046992266, 30.209739847504217]
+    map_downloader(ox, 18)
