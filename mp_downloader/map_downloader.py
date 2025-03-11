@@ -3,18 +3,20 @@ import sys
 import time
 import math
 import requests
-from PIL import Image, ImageDraw, ImageFont
+import threading
 import numpy as np
+from PIL import Image, ImageDraw, ImageFont
+from concurrent.futures import ThreadPoolExecutor, wait
 
 currend_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(currend_dir)
 style = "s"
+lock = threading.Lock()
 map_dir = os.path.join(currend_dir, f"{style}map")
-# run --skip-3dmodel
+proxies = {"http": "socks5h://127.0.0.1:1080", "https": "socks5h://127.0.0.1:1080"}
 
 
 def download(x, y, z):
-    proxies = {"http": "socks5h://127.0.0.1:1080", "https": "socks5h://127.0.0.1:1080"}
     # url = f"https://khms0.google.com/kh/v=979?x={x}&y={y}&z={z}"
     # url = f"https://mt.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
     url = f"http://www.google.com/maps/vt?lyrs={style}@820&gl=cn&x={x}&y={y}&z={z}"
@@ -27,9 +29,10 @@ def download(x, y, z):
                 filepath) == file_size:
             print(f'{filepath} has already download.')
             return True
-        if not os.path.exists(path):
-            os.makedirs(path)
-        print(url)
+        with lock:
+            if not os.path.exists(path):
+                os.makedirs(path)
+        # print(url)
         response = requests.get(url, proxies=proxies)
         if response.status_code == 200:
             with open(filepath, "wb") as f:
@@ -109,28 +112,32 @@ def merge(x1, y1, x2, y2, ox, z, mark=False):
     final_img.save(img_path)
 
 
+def download_tile(x, y, zoom):
+    while not download(x, y, zoom):
+        time.sleep(5)
+
+
 def map_downloader(ox, zoom=17):
     x, y = lonlat2xyz(ox[0], ox[1], zoom)
-    x1, y1 = x - 8, y - 6
-    x2, y2 = x + 7, y + 5
+    x1, y1 = x - 7, y - 5
+    x2, y2 = x + 8, y + 6
     # x1, y1 = x - 6, y - 7
     # x2, y2 = x + 6, y + 8
+    counts = (abs(x2 - x1) + 1) * (abs(y2 - y1) + 1)
     total = (x2 - x1 + 1) * (y2 - y1 + 1)
-    print(x1, y1, zoom)
-    print(x2, y2, zoom)
-    count = 0
-    try:
-        for i in range(x1, x2 + 1):
-            for j in range(y1, y2 + 1):
-                count += 1
-                print("{m}/{n}".format(m=count, n=total))
-                while not download(i, j, zoom):
-                    time.sleep(5)
-        merge(x1, y1, x2, y2, ox, zoom, mark=True)
-    except KeyboardInterrupt:
-        pass
+    print(x, y, zoom, counts)
+    tasks = []
+    with ThreadPoolExecutor(max_workers=12) as executor:
+        try:
+            for i in range(x1, x2 + 1):
+                for j in range(y1, y2 + 1):
+                    tasks.append(executor.submit(download_tile, i, j, zoom))
+            wait(tasks)
+            merge(x1, y1, x2, y2, ox, zoom, mark=True)
+        except KeyboardInterrupt:
+            pass
 
 
 if __name__ == '__main__':
-    ox = [16.629225994412607, 98.56161184827307]
+    ox = [33.6121766228736, -117.91736266803686]
     map_downloader(ox, 18)
