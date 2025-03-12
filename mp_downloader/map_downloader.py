@@ -121,21 +121,20 @@ def map_downloader(ox, zoom=17):
     x, y = lonlat2xyz(ox[0], ox[1], zoom)
     x1, y1 = x - 7, y - 5
     x2, y2 = x + 8, y + 6
-    # x1, y1 = x - 6, y - 7
+    # x1, y1 = x - 5, y - 7
     # x2, y2 = x + 6, y + 8
     counts = (abs(x2 - x1) + 1) * (abs(y2 - y1) + 1)
-    total = (x2 - x1 + 1) * (y2 - y1 + 1)
     print(x, y, zoom, counts)
     tasks = []
     with ThreadPoolExecutor(max_workers=12) as executor:
-        try:
-            for i in range(x1, x2 + 1):
-                for j in range(y1, y2 + 1):
-                    tasks.append(executor.submit(download_tile, i, j, zoom))
-            wait(tasks)
-            merge(x1, y1, x2, y2, ox, zoom, mark=True)
-        except KeyboardInterrupt:
-            pass
+        for i in range(x1, x2 + 1):
+            for j in range(y1, y2 + 1):
+                tasks.append(executor.submit(download_tile, i, j, zoom))
+    try:
+        wait(tasks)
+        merge(x1, y1, x2, y2, ox, zoom, mark=True)
+    except KeyboardInterrupt:
+        pass
 
 
 if __name__ == '__main__':
