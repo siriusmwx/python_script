@@ -10,16 +10,18 @@ from concurrent.futures import ThreadPoolExecutor, wait
 
 currend_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(currend_dir)
-style = "s"
+style = "s"  # p:地形图 r:道路图 s:卫星图 y:混合图
 lock = threading.Lock()
-map_dir = os.path.join(currend_dir, f"{style}map")
-proxies = {"http": "socks5h://127.0.0.1:1080", "https": "socks5h://127.0.0.1:1080"}
+map_dir = os.path.join(currend_dir, f"mdata{os.sep}{style}map")
+proxies = {"http": "socks5h://127.0.0.1:1080",
+           "https": "socks5h://127.0.0.1:1080"}
 
 
 def download(x, y, z):
     # url = f"https://khms0.google.com/kh/v=979?x={x}&y={y}&z={z}"
     # url = f"https://mt.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
-    url = f"http://www.google.com/maps/vt?lyrs={style}@820&gl=cn&x={x}&y={y}&z={z}"
+    # url = f"http://www.google.com/maps/vt?lyrs={style}@820&gl=cn&x={x}&y={y}&z={z}"
+    url = f"https://khms3.google.com/kh/v=995?x={x}&y={y}&z={z}"
     path = os.path.join(map_dir, f"{z}{os.sep}{x}")
     filepath = os.path.join(path, f"{y}.png")
     try:
@@ -55,13 +57,20 @@ def lonlat2xyz(lat, lon, zoom):
     return int(x), int(y)
 
 
+def xyz2lonlat(x, y, zoom):
+    n = math.pow(2, zoom)
+    lon = x / n * 360 - 180
+    lat = math.atan(math.sinh(math.pi * (1 - 2 * y / n))) * 180 / math.pi
+    return lat, lon
+
+
 def convert_point(point):
     point = abs(point)
-    degree = int(point)  #度
+    degree = int(point)  # 度
     numdecimal = point - degree
     tmp = numdecimal * 3600
-    minute = int(tmp // 60)  #分
-    second = int(tmp - minute * 60)  #秒
+    minute = int(tmp // 60)  # 分
+    second = int(tmp - minute * 60)  # 秒
     return f"{degree}°{minute:02}′{second:02.0f}″"
 
 
@@ -95,7 +104,8 @@ def merge(x1, y1, x2, y2, ox, z, mark=False):
     for i in range(x1, x2 + 1):
         col_list = list()
         for j in range(y1, y2 + 1):
-            img = Image.open(os.path.join(map_dir, f"{z}{os.sep}{i}{os.sep}{j}.png"))
+            img = Image.open(os.path.join(
+                map_dir, f"{z}{os.sep}{i}{os.sep}{j}.png"))
             # print(img.mode)
             if img.mode != "RGB":
                 img = img.convert("RGB")
