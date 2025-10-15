@@ -13,15 +13,17 @@ os.chdir(currend_dir)
 style = "s"  # p:地形图 r:道路图 s:卫星图 y:混合图
 lock = threading.Lock()
 map_dir = os.path.join(currend_dir, f"mdata{os.sep}{style}map")
-proxies = {"http": "socks5h://127.0.0.1:1080",
-           "https": "socks5h://127.0.0.1:1080"}
+proxies = {
+    "http": "socks5h://127.0.0.1:1080",
+    "https": "socks5h://127.0.0.1:1080"
+}
 
 
 def download(x, y, z):
     # url = f"https://khms0.google.com/kh/v=979?x={x}&y={y}&z={z}"
-    # url = f"https://mt.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
+    url = f"https://mt.google.com/vt/lyrs={style}&x={x}&y={y}&z={z}"
     # url = f"http://www.google.com/maps/vt?lyrs={style}@820&gl=cn&x={x}&y={y}&z={z}"
-    url = f"https://khms3.google.com/kh/v=995?x={x}&y={y}&z={z}"
+    # url = f"https://khms3.google.com/kh/v=995?x={x}&y={y}&z={z}"
     path = os.path.join(map_dir, f"{z}{os.sep}{x}")
     filepath = os.path.join(path, f"{y}.png")
     try:
@@ -52,8 +54,9 @@ def download(x, y, z):
 def lonlat2xyz(lat, lon, zoom):
     n = math.pow(2, zoom)
     x = ((lon + 180) / 360) * n
-    y = (1 - (math.log(math.tan(math.radians(lat)) +
-                       (1 / math.cos(math.radians(lat)))) / math.pi)) / 2 * n
+    y = (1 - (math.log(
+        math.tan(math.radians(lat)) +
+        (1 / math.cos(math.radians(lat)))) / math.pi)) / 2 * n
     return int(x), int(y)
 
 
@@ -86,16 +89,33 @@ def latlng_dec2rad(ox):
     return f"{convert_point(ox[0])}{x} {convert_point(ox[1])}{y}"
 
 
-def modifyimage(img, ox):
+def modifyimage(img, ox, date="2025-02-18"):
     txt = latlng_dec2rad(ox)
     # img = Image.open(img)
     draw = ImageDraw.Draw(img)
     imgsize = img.size
-    draw_font = ImageFont.truetype('consola.ttf', imgsize[1] // 64)
+    draw_font = ImageFont.truetype('consola.ttf', imgsize[1] // 60)
     txtsize = draw_font.getbbox(txt)
-    draw.rectangle([txtsize[3], txtsize[3], txtsize[2] + txtsize[3], 2 * txtsize[3]],
-                   fill="black")
+    draw.rectangle(
+        [txtsize[3], txtsize[3], txtsize[2] + txtsize[3], 2 * txtsize[3]],
+        fill="black")
     draw.text([txtsize[3], txtsize[3]], txt, font=draw_font, fill="orange")
+    if date:
+        date_font = ImageFont.truetype('consola.ttf', imgsize[1] // 50)
+        datesize = date_font.getbbox(date)
+        draw.rectangle([
+            imgsize[0] - datesize[2] - 0.5 * datesize[3],
+            imgsize[1] - 1.5 * datesize[3], imgsize[0] - 0.5 * datesize[3],
+            imgsize[1] - 0.5 * datesize[3]
+        ],
+                       fill="black")
+        draw.text([
+            imgsize[0] - datesize[2] - 0.5 * datesize[3],
+            imgsize[1] - 1.5 * datesize[3]
+        ],
+                  date,
+                  font=date_font,
+                  fill="orange")
 
 
 def merge(x1, y1, x2, y2, ox, z, mark=False):
@@ -104,8 +124,8 @@ def merge(x1, y1, x2, y2, ox, z, mark=False):
     for i in range(x1, x2 + 1):
         col_list = list()
         for j in range(y1, y2 + 1):
-            img = Image.open(os.path.join(
-                map_dir, f"{z}{os.sep}{i}{os.sep}{j}.png"))
+            img = Image.open(
+                os.path.join(map_dir, f"{z}{os.sep}{i}{os.sep}{j}.png"))
             # print(img.mode)
             if img.mode != "RGB":
                 img = img.convert("RGB")
@@ -129,10 +149,12 @@ def download_tile(x, y, zoom):
 
 def map_downloader(ox, zoom=17):
     x, y = lonlat2xyz(ox[0], ox[1], zoom)
-    x1, y1 = x - 7, y - 5
-    x2, y2 = x + 8, y + 6
-    # x1, y1 = x - 5, y - 7
-    # x2, y2 = x + 6, y + 8
+    # x1, y1 = x - 7, y - 5
+    # x2, y2 = x + 8, y + 6
+    x1, y1 = x - 5, y - 7
+    x2, y2 = x + 6, y + 8
+    print(x1, y1)
+    print(x2, y2)
     counts = (abs(x2 - x1) + 1) * (abs(y2 - y1) + 1)
     print(x, y, zoom, counts)
     tasks = []
@@ -148,5 +170,5 @@ def map_downloader(ox, zoom=17):
 
 
 if __name__ == '__main__':
-    ox = [33.6121766228736, -117.91736266803686]
-    map_downloader(ox, 18)
+    ox = [28.139025945186443, -15.421299514620925]
+    map_downloader(ox, 17)
