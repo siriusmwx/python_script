@@ -1,9 +1,9 @@
 import os
 import time
 import itertools
+from io import BytesIO
 import concurrent.futures
 from dataclasses import dataclass
-from io import BytesIO
 import requests
 from PIL import Image
 
@@ -27,35 +27,17 @@ class Tile:
     image: Image.Image
 
 
-def get_width_and_height_from_zoom(zoom: int):
-    """
-    Returns the width and height of a panorama at a given zoom level, depends on the
-    zoom level.
-    """
-    return 2**zoom, 2**(zoom - 1)
-
-
-def make_download_url(pano_id: str, zoom: int, x: int, y: int) -> str:
-    """
-    Returns the URL to download a tile.
-    """
-    return (
-        f"https://streetviewpixels-pa.googleapis.com/v1/tile?cb_client=maps_sv.tactile&panoid={pano_id}&x={x}&y={y}&zoom={zoom}"
-    )
-
-
 def fetch_panorama_tile(tile_info: TileInfo, dl_path: str):
     """
     Tries to download a tile, returns a PIL Image.
     """
-    # for _ in range(max_retries):
     while True:
         try:
-            print(tile_info.fileurl)
             filepath = os.path.join(dl_path, "%s_%s.jpg" % (tile_info.x, tile_info.y))
             response = requests.get(tile_info.fileurl, proxies=proxys, stream=True)
             with open(filepath, "wb") as f:
                 f.write(response.content)
+            print("Download %s success." % filepath)
             return Image.open(BytesIO(response.content))
         except requests.ConnectionError:
             print("Connection error. Trying again in 2 seconds.")
@@ -66,12 +48,13 @@ def iter_tile_info(pano_id: str, zoom: int):
     """
     Generate a list of a panorama's tiles and their position.
     """
-    width, height = get_width_and_height_from_zoom(zoom)
+    width, height = 2**zoom, 2**(zoom - 1)
     for x, y in itertools.product(range(width), range(height)):
         yield TileInfo(
             x=x,
             y=y,
-            fileurl=make_download_url(pano_id=pano_id, zoom=zoom, x=x, y=y),
+            fileurl=
+            f"https://streetviewpixels-pa.googleapis.com/v1/tile?cb_client=maps_sv.tactile&panoid={pano_id}&x={x}&y={y}&zoom={zoom}",
         )
 
 
@@ -108,7 +91,7 @@ def get_panorama(pano_id: str, zoom: int = 5, m_thread: bool = True):
     dl_path = os.path.join(map_dir, "%s_%s" % (pano_id, 5))
     if not os.path.exists(dl_path):
         os.makedirs(dl_path)
-    total_width, total_height = get_width_and_height_from_zoom(zoom)
+    total_width, total_height = 2**zoom, 2**(zoom - 1)
     panorama = Image.new("RGB", (total_width * tile_width, total_height * tile_height))
 
     for tile in iter_tiles(pano_id=pano_id, zoom=zoom, dl_path=dl_path,
@@ -120,8 +103,8 @@ def get_panorama(pano_id: str, zoom: int = 5, m_thread: bool = True):
 
 
 if __name__ == '__main__':
-    panoid = "XMthJ85wQkuUvW8rIVeTVQ"
-    # panoid = "tdVgUHc3-PVfh5mjES8sjw"
+    # panoid = "XMthJ85wQkuUvW8rIVeTVQ"
+    panoid = "tdVgUHc3-PVfh5mjES8sjw"
     # panoid = "4nOnCr5_6hR1Jcvxu3ntPw"
-    image = get_panorama(pano_id=panoid)
+    image = get_panorama(pano_id=panoid, zoom=4)
     image.save("%s.jpg" % panoid, "jpeg")
