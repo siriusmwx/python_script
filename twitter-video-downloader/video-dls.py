@@ -17,11 +17,15 @@ os.chdir(current_dir)
 # ffmpeg -i 1923_S01E01.mkv -ss 00:57:18 -t 00:02:10 -c:v libx264 -c:a libfaac 1923_S01E01_2.mkv
 # ffmpeg -ss 00:57:08 -t 00:02:20 -i 1923_S01E01.mkv -vcodec copy -acodec copy 1923_S01E01_1.mp4
 # ffmpeg -i 1923_S01E01_0.mkv -vcodec copy -acodec aac 1923_S01E01_0.mp4
-# ffmpeg -ss 00:47:20 -t 00:00:40 -i output.mp4 -vcodec copy -acodec copy output_1.mp4
-# ffmpeg -i videoplayback.mp4 -i videoplayback.m4a -vcodec copy -acodec copy videoplayback_c.mp4
+# ffmpeg -i The_Counselor1.mp4 -ss 00:00:00 -t 00:01:30 The_Counselor_1.mp4
+# ffmpeg -i videoplayback.mp4 -i videoplayback.m4a videoplayback_c.mp4
 # ffmpeg -i Northern_Lights.mp4 -vcodec copy -an Northern_Lights1.mp4
 # ffmpeg -i 3.mp4 -acodec copy -vn 3.m4a
 # ffmpeg -f concat -i aa.txt -c copy alexhook.mp4
+# whisper The_Counselor.mp4 --model medium.en
+# ffmpeg -protocol_whitelist concat,file,http,https,tcp,tls,crypto -i index.m3u8 -c copy result.mp4
+# ffmpeg -i The_Counselor.mp4 -vf "subtitles=The_Counselor.srt:force_style='FontName=msyh,FontSize=18'" The_Counselor1.mp4
+# ffmpeg -i The_Counselor.mp4 -vf "subtitles=The_Counselor.srt:force_style='FontName=msyh,FontSize=18,PrimaryColour=&H00FFFF'" output.mp4
 
 
 class VideoDownloader:
