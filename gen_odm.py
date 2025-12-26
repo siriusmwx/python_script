@@ -12,6 +12,7 @@ from pyodm import Node
 # docker rm -v $(docker ps -aq)
 # docker cp /home/user/cropper.py docker_id:/code/opendm/
 # docker exec -u root -it docker_id /bin/bash
+# run --min-num-features 20000 --matcher-type bruteforce --fast-orthophoto D:\DJI\jjh
 class Gen_Odm:
     datas = {"fast-orthophoto": True}
 
@@ -21,10 +22,7 @@ class Gen_Odm:
         assert self.docker_id != None, "未找到nodeodm容器，请确认是否启动"
 
     def get_docker_id(self):
-        proc = run("docker ps",
-                   shell=True,
-                   capture_output=True,
-                   universal_newlines=True)
+        proc = run("docker ps", shell=True, capture_output=True, universal_newlines=True)
         for txt in proc.stdout.split("\n"):
             result = re.search("(.*)opendronemap/nodeodm", txt)
             if result:
@@ -32,9 +30,7 @@ class Gen_Odm:
         return None
 
     def gen_orthophoto(self, image_dir):
-        images = [
-            os.path.join(image_dir, image) for image in os.listdir(image_dir)
-        ]
+        images = [os.path.join(image_dir, image) for image in os.listdir(image_dir)]
         # print(images)
         self.task = self.n_odm.create_task(images, options=self.datas)
         print("创建任务%s" % self.task.uuid)
@@ -57,13 +53,9 @@ class Gen_Odm:
         dl_dir = os.path.join(image_dir, "result")
         if not os.path.exists(dl_dir):
             os.mkdir(dl_dir)
-        resp = self.task.get("/task/%s/download/all.zip" % self.task.uuid,
-                             stream=True)
+        resp = self.task.get("/task/%s/download/all.zip" % self.task.uuid, stream=True)
         file_size = int(resp.headers.get('content-length', 0))
-        p_bar = tqdm(total=file_size,
-                     unit='iB',
-                     colour='green',
-                     unit_scale=True)
+        p_bar = tqdm(total=file_size, unit='iB', colour='green', unit_scale=True)
         with open(os.path.join(dl_dir, "result.zip"), 'wb') as file:
             for data in resp.iter_content(chunk_size=1024):
                 p_bar.update(len(data))
