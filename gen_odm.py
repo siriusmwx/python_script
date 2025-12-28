@@ -9,12 +9,17 @@ from pyodm import Node
 
 
 # unset http_proxy https_proxy
+# docker load -i opendronemap_nodeodm_latest-amd64.tar.gz
+# docker run -p 3000:3000 opendronemap/nodeodm
 # docker rm -v $(docker ps -aq)
+# docker start contain_id
 # docker cp /home/user/cropper.py docker_id:/code/opendm/
 # docker exec -u root -it docker_id /bin/bash
 # run --min-num-features 20000 --matcher-type bruteforce --fast-orthophoto D:\DJI\jjh
+# run --skip-3dmodel --fast-orthophoto --matcher-neighbors 10 D:\DJI\backup\jjh
 class Gen_Odm:
-    datas = {"fast-orthophoto": True}
+    datas1 = {"fast-orthophoto": True}
+    datas2 = {"skip-3dmodel": True, "matcher-neighbors": 10, "min-num-features": 20000}
 
     def __init__(self, hostname="127.0.0.1", port=3000):
         self.n_odm = Node(hostname, port)
@@ -32,7 +37,7 @@ class Gen_Odm:
     def gen_orthophoto(self, image_dir):
         images = [os.path.join(image_dir, image) for image in os.listdir(image_dir)]
         # print(images)
-        self.task = self.n_odm.create_task(images, options=self.datas)
+        self.task = self.n_odm.create_task(images, options=self.datas1)
         print("创建任务%s" % self.task.uuid)
         print("正在处理任务......")
         pbar = tqdm(total=100, unit="%", colour='green', unit_scale=True)
