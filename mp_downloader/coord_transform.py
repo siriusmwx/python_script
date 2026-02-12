@@ -9,6 +9,8 @@ a = 6378245.0  # 长半轴
 ee = 0.00669342162296594323  # 偏心率平方
 
 
+# https://maps.moomoo.me/
+# https://developers.google.com/maps/documentation/places/web-service/place-id?hl=zh-cn
 class Geocoding:
     def __init__(self, api_key):
         self.api_key = api_key
@@ -164,6 +166,6 @@ if __name__ == '__main__':
     # result6 = wgs84_to_bd09(lng, lat)
 
     # g = Geocoding('API_KEY')  # 这里填写你的高德api的key
-    # result7 = g.geocode('北京市朝阳区朝阳公园')
+    # result7 = g.geocode('北海')
     # print(result1, result2, result3, result4, result5, result6, result7)
     print("%s, %s" % (result[1], result[0]))
