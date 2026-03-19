@@ -8,9 +8,11 @@ pi = 3.1415926535897932384626  # π
 a = 6378245.0  # 长半轴
 ee = 0.00669342162296594323  # 偏心率平方
 
-
 # https://maps.moomoo.me/
 # https://developers.google.com/maps/documentation/places/web-service/place-id?hl=zh-cn
+# exiftool -all= -tagsfromfile @ -icc_profile -ColorSpace -DateTimeOriginal -OverWrite_Original .
+
+
 class Geocoding:
     def __init__(self, api_key):
         self.api_key = api_key
