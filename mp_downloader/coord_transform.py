@@ -12,6 +12,9 @@ ee = 0.00669342162296594323  # 偏心率平方
 # https://developers.google.com/maps/documentation/places/web-service/place-id?hl=zh-cn
 # exiftool -all= -tagsfromfile @ -icc_profile -ColorSpace -DateTimeOriginal -OverWrite_Original .
 # exiftool -all= -tagsfromfile @ -icc_profile -DateTimeOriginal -OverWrite_Original
+# exiftool -DateTimeOriginal="2012:12:31 12:30:00" image.jpg
+# exiftool -c "%.6f" -gpslatitude -gpslongitude image.jpg
+# exiftool -GPSLatitude=30 -GPSLongitude=120 image.jpg
 # exiftool -XMP-GPano:ProjectionType="equirectangular" -XMP-GPano:UsePanoramaViewer="True" "-XMP-GPano:CroppedAreaImageWidthPixels<ImageWidth" "-XMP-GPano:CroppedAreaImageHeightPixels<ImageHeight" "-XMP-GPano:FullPanoWidthPixels<ImageWidth" "-XMP-GPano:FullPanoHeightPixels<ImageHeight" -XMP-GPano:CroppedAreaLeftPixels=0 -XMP-GPano:CroppedAreaTopPixels=0 -overwrite_original .
 
 
